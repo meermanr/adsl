@@ -5,20 +5,20 @@ def get_up_and_down_sync_rates():
 	password=""
 	modem_ip="192.168.1.1"
 
-	import telnetlib
-
 	up = None
 	down = None
 
 	try:
-		tn = telnetlib.Telnet(modem_ip, 23, 5)
-		tn.read_until("Password: ", 5)
-		tn.write(password + "\n")
-		tn.read_until("modem> ", 5)
-		tn.write("wan adsl chandata\n")
-		s = tn.expect(["modem> "])[2]
-		tn.write("exit\n")
-		tn.read_all()
+		import socket
+		import time
+		sock = socket.socket()
+		sock.connect( (modem_ip, 23) )
+		sock.sendall(password+"\nwan adsl chandata\nexit\n")
+		s = ""
+		while "far-end fast channel bit rate: " not in s:
+			s += sock.recv(4096)
+		sock.shutdown(socket.SHUT_WR|socket.SHUT_RD)
+		sock.close()
 
 		for line in s.replace("\r", "").split("\n"):
 			rate = None
@@ -34,7 +34,15 @@ def get_up_and_down_sync_rates():
 	except EOFError:
 		tn.close()
 
-	return (int(up), int(down))
+	if up:
+		up = int(up)
+
+	if down:
+		down = int(down)
+
+	return (up, down)
 
 if __name__ == "__main__":
-	print "%d\t%d" % get_up_and_down_sync_rates()
+	# Suitable for RRDtool
+	up, down = get_up_and_down_sync_rates()
+	print "%s:%s" % (up or "U", down or "U")
