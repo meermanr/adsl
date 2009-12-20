@@ -1,3 +1,4 @@
+<a href='now.php'>Query ADSL Sync rates now</a>
 <?php
 $graphs = array();
 $graphs[] = array( "ADSL", "--lower-limit=0 DEF:sync_down_kbps=adsl.rrd:sync_down:MIN \
