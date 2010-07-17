@@ -1,2 +1,5 @@
 adsl.rrd
 supervise/
+.last_gw_ping
+.last_plusnet_stable_rate
+.last_sync_rates

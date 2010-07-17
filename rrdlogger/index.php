@@ -1,12 +1,18 @@
 <a href='now.php'>Query ADSL Sync rates now</a>
 <?php
 $graphs = array();
-$graphs[] = array( "ADSL", "--lower-limit=0 DEF:sync_down_kbps=adsl.rrd:sync_down:MIN \
+$graphs[] = array( "ADSL", "--lower-limit=0 \
+    DEF:sync_down_kbps=adsl.rrd:sync_down:MIN \
 	DEF:ip_profile_kbps=adsl.rrd:ip_profile:MIN \
+	DEF:gw_ping_ms=adsl.rrd:gw_ping:MIN \
+    \
 	CDEF:sync_down=sync_down_kbps,1000,* \
 	CDEF:ip_profile=ip_profile_kbps,1000,* \
-	AREA:sync_down#ffcc99:'ADSL Sync (down)' \
-	LINE:ip_profile#009900:'IP Profile' \
+	CDEF:gw_ping=gw_ping_ms,50000,* \
+    \
+	AREA:sync_down#ffcc99:'ADSL Downstream (bits/second)' \
+	LINE:ip_profile#009900:'IP Profile (bits/second)' \
+	LINE:gw_ping#cc0000:'Gateway Latency (1.0M == 20ms)' \
 ");
 
 $periods = array(
