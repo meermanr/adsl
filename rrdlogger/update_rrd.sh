@@ -16,6 +16,8 @@ then
 		DS:sync_up:GAUGE:600:0:1000 \
 		DS:ip_profile:GAUGE:600:0:8000 \
 		DS:gw_ping:GAUGE:600:0:U \
+		DS:wan_down:COUNTER:600:0:U \
+		DS:wan_up:COUNTER:600:0:U \
 		RRA:MIN:0.5:1:4032 \
 		RRA:MIN:0.5:12:672 \
 		RRA:MIN:0.5:288:56 \
@@ -28,12 +30,6 @@ then
 		RRA:MAX:0.5:1008:56 \
 		RRA:MAX:0.5:2016:48 \
 		RRA:MAX:0.5:8064:120
-		RRA:MIN:0.5:1:4032 \
-		RRA:MIN:0.5:12:672 \
-		RRA:MIN:0.5:288:56 \
-		RRA:MIN:0.5:1008:56 \
-		RRA:MIN:0.5:2016:48 \
-		RRA:MIN:0.5:8064:120
 fi
 
 # RRD does not require that all data stores (DS) be updated at once, but in 
@@ -74,21 +70,24 @@ do
     ./get_sync_rates.py > .last_sync_rates &
     ./get_gw_ping.py > .last_gw_ping &
     ./get_plusnet_stable_rate.py > .last_plusnet_stable_rate &
+    ./get_wan_usage.py > .last_wan_usage &
 
     wait
 
     SYNC=$(cat .last_sync_rates)
     PING=$(cat .last_gw_ping)
     BRAS=$(cat .last_plusnet_stable_rate)
+    WANU=$(cat .last_wan_usage)
 
     [ -z "$SYNC" ] && SYNC="U:U"
     [ -z "$PING" ] && PING="U"
     [ -z "$BRAS" ] && BRAS="U"
+    [ -z "$WANU" ] && WANU="U:U"
 
     # Update all RRD DS at once
     rrdtool update $DB \
-        -t sync_up:sync_down:gw_ping:ip_profile \
-        $TIMESTAMP:$(cat .last_sync_rates):$(cat .last_gw_ping):$(cat .last_plusnet_stable_rate)
+        -t sync_up:sync_down:gw_ping:ip_profile:wan_up:wan_down \
+        $TIMESTAMP:$SYNC:$PING:$BRAS:$WANU
 
         # Sleep for half the RRD's step interval, effectively feeding the RRD 
         # samples at double its internal sampling rate.

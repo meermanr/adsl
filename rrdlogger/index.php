@@ -3,16 +3,24 @@
 $graphs = array();
 $graphs[] = array( "ADSL", "--lower-limit=0 \
     DEF:sync_down_kbps=adsl.rrd:sync_down:MIN \
+    DEF:sync_up_kbps=adsl.rrd:sync_up:MIN \
 	DEF:ip_profile_kbps=adsl.rrd:ip_profile:MIN \
 	DEF:gw_ping_ms=adsl.rrd:gw_ping:MIN \
+	DEF:wan_down_bytes=adsl.rrd:wan_down:MAX \
+	DEF:wan_up_bytes=adsl.rrd:wan_up:MAX \
     \
 	CDEF:sync_down=sync_down_kbps,1000,* \
+	CDEF:sync_up=sync_up_kbps,1000,*,-1,* \
 	CDEF:ip_profile=ip_profile_kbps,1000,* \
 	CDEF:gw_ping=gw_ping_ms,50000,* \
+    CDEF:wan_down=wan_down_bytes,8,* \
+    CDEF:wan_up=wan_up_bytes,8,*,-1,* \
     \
-	AREA:sync_down#ffcc99:'ADSL Downstream (bits/second)' \
-	LINE:ip_profile#009900:'IP Profile (bits/second)' \
-	LINE:gw_ping#cc0000:'Gateway Latency (1.0M == 20ms)' \
+	AREA:sync_down#ffcc99:'Connection speed (bit/s)' \
+	AREA:wan_down#ccccff:'Download use (bit/s)' \
+	AREA:wan_up#ff0000:'Upload use (bit/s)' \
+	LINE:ip_profile#009900:'ISP Limit (bit/s)' \
+	LINE:gw_ping#cc0000:'Gateway Latency (1M == 20ms)' \
 ");
 
 $periods = array(
@@ -47,7 +55,7 @@ foreach( $periods as $period )
 			--end '$p_end' \
 			--title '$title' \
 			--width 800 \
-			--height 100 \
+			--height 200 \
 			--imgformat PNG \
 			$def \
 			2>&1 1>/dev/null");
