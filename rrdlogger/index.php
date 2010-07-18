@@ -17,7 +17,7 @@ $graphs[] = array( "ADSL", "--lower-limit=0 \
     CDEF:wan_up=wan_up_bytes,8,*,-1,* \
     \
 	AREA:sync_down#ffcc99:'Connection speed (bit/s)' \
-	AREA:wan_down#ccccff:'Download use (bit/s)' \
+	AREA:wan_down#ee00cc:'Download use (bit/s)' \
 	AREA:wan_up#ff0000:'Upload use (bit/s)' \
 	LINE:ip_profile#009900:'ISP Limit (bit/s)' \
 	LINE:gw_ping#cc0000:'Gateway Latency (1M == 20ms)' \
