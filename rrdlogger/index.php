@@ -49,11 +49,14 @@ foreach( $periods as $period )
 
 		$filename = "images/g_${safe_title}_${safe_period}.png";
 
+        // TODO: Fix data in RRD and remove --upper-limit + --rigid
 		system("
 			rrdtool graph $filename \
 			--start '$p_start' \
 			--end '$p_end' \
 			--title '$title' \
+            --upper-limit 6000000 \
+            --rigid \
 			--width 800 \
 			--height 200 \
 			--imgformat PNG \
