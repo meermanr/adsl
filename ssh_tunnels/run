@@ -1,0 +1,2 @@
+#!/bin/bash
+exec setuidgid meermanr ssh meermanr@robmeerman.co.uk -o ExitOnForwardFailure=yes -o BatchMode=yes -R2222:127.0.0.1:22 -N

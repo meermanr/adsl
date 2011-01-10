@@ -1,0 +1,5 @@
+# This ignore file exists so that the directory can be kept as part of the git 
+# repo. The contents of this dir change all the time, so we don't version its 
+# contents. However the existance of this directory is required for `supervise` 
+# to function correctly.
+*
