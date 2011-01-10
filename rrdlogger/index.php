@@ -17,9 +17,9 @@ $graphs[] = array( "ADSL", "--lower-limit=0 \
     CDEF:wan_up=wan_up_bytes,8,*,-1,* \
     \
 	AREA:sync_down#ffcc99:'Connection speed (bit/s)' \
-	AREA:wan_down#ee00cc:'Download use (bit/s)' \
+	AREA:wan_down#009900:'Download use (bit/s)' \
 	AREA:wan_up#ff0000:'Upload use (bit/s)' \
-	LINE:ip_profile#009900:'ISP Limit (bit/s)' \
+	LINE2:ip_profile#000099:'ISP Limit (bit/s)' \
 	LINE:gw_ping#cc0000:'Gateway Latency (1M == 20ms)' \
 ");
 
@@ -28,8 +28,8 @@ $periods = array(
 	array("Last 2 hours", "now - 2 hours", "now"),
 	array("Today", "00:00", "23:59"),
 	array("Yesterday", "00:00 - 24 hours", "23:59 - 24 hours"),
-	array("This week", "00:00 Monday", "00:00 Monday + 1 week"),
-	array("Last week", "00:00 Monday - 1 week", "00:00 Monday"),
+	array("This week", "00:00 Sunday", "00:00 Sunday + 1 week"),
+	array("Last week", "00:00 Sunday - 1 week", "00:00 Sunday"),
 	array("Last 4 weeks", "now - 4 week", "now"),
 	array("Last 6 months", "now - 6 months", "now"),
 );
