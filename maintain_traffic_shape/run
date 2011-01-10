@@ -1,0 +1,2 @@
+#!/bin/bash
+exec setuidgid meermanr ./maintain_traffic_shape.py
