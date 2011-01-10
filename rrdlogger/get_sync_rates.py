@@ -22,8 +22,9 @@ def get_up_and_down_sync_rates():
                 if e.args[0] == 111:
                     # 111: Connection refused
                     time.sleep(1)
-                else:
-                    raise
+        else:
+            # Did not break
+            return ("U", "U")
 
         sock.sendall(password+"\nwan adsl chandata\nexit\n")
         s = ""
