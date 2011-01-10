@@ -1,0 +1,4 @@
+#!/bin/bash
+# Log with timestamps to current directory
+# Default rotation is at approx 99,999 bytes, keeping 10 rotated files
+exec setuidgid meermanr multilog t .
