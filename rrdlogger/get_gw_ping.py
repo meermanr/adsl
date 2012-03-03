@@ -2,76 +2,44 @@
 # Ping the upstream gateway (i.e. ISP)
 
 def get_gateway_ip():
+    username="admin"
     password=""
-    modem_ip="192.168.1.1"
+    modem_ip="192.168.1.254"
+
+    import telnetlib
 
     try:
-        import socket
-        import time
+        c = telnetlib.Telnet(modem_ip)
 
-        sock = socket.socket()
+        c.read_until("Login: ")
+        c.write(username+"\n")
 
-        for i in range(10):
-            try:
-                sock.connect( (modem_ip, 23) )
-                break
-            except socket.error, e:
-                if e.args[0] == 111:
-                    # 111: Connection refused
-                    time.sleep(1)
-                else:
-                    raise
+        c.read_until("Password: ")
+        c.write(password+"\n")
 
-        sock.sendall(password+"\nip route status\nexit\n")
+        c.read_until("admin> ")
+        c.write("transport show wanlink\n")
 
-        # Example response
+        # Example output:
         #
-        # Password: ******
-        # Copyright (c) 1994 - 2007 ZyXEL Communications Corp.
-        # P-660R-D1> ip route status 
-        # Dest            FF Len Device     Gateway         Metric stat Timer  Use
-        # 195.166.128.242 00 32  mpoa00     195.166.128.242   1    03a9 0      159
-        # 192.168.1.0     00 24  enet0      192.168.1.1       1    041b 0      521464
-        # default         00 0   mpoa00     MyISP             2    00ab 0      536113
-        # P-660R-D1> exit
-        # 
-        s = ""
-        while " enet0 " not in s:
-            p = sock.recv(4096)
-            if p == "": break
-            s += p
-            time.sleep(0.02)
-        sock.shutdown(socket.SHUT_WR|socket.SHUT_RD)
-        sock.close()
+        # Summary Err          : 
+        # Uptime               : 272397
+        # Idletime             : 0
+        # NCPRemote Addr       : 195.166.130.59
+        # MACAddress           : 00:04:ed:bf:98:c0
+        # SVC                  : false
+        # Remote Atm           : 
+        # Test Result          : InvaliAtm Channel
+        # Tx Vci               : 38
+        # Rx Vci               : 38
+        # Class                : UBR
+        # Port                 : a1
 
-        for line in s.replace("\r", "").split("\n"):
-            # Field starter bytes
-            #                 15     22                           52        61
-            #                 |      |                            |         |
-            # 195.166.128.242 00 32  mpoa00     195.166.128.242   1    03a9 0      159
-            # |                  |              |                      |           |
-            # 0                  18             34                     56          68
-            d = dict()
-            d["Dest"] = line[:15].strip()
-            d["FF"] = line[15:18].strip()
-            d["Len"] = line[18:22].strip()
-            d["Device"] = line[22:34].strip()
-            d["Gateway"] = line[34:52].strip()
-            d["Metric"] = line[52:56].strip()
-            d["stat"] = line[56:61].strip()
-            d["Timer"] = line[61:68].strip()
-            d["Use"] = line[68:].strip()
+        c.read_until("NCPRemote Addr       : ")
+        return c.read_until("\n").strip()
 
-            if d["FF"] != "00":
-                # Not a routing table entry (or at least, not a normal one)
-                continue
-
-            if d["Device"] == "mpoa00" and d["Dest"] == d["Gateway"]:
-                # Default WAN route
-                return d["Gateway"]
-
-    except EOFError:
-        s.close()
+    finally:
+        c.close()
 
 def get_avg_ping_gw():
     import os
@@ -84,7 +52,7 @@ def get_avg_ping_gw():
     #   -l 3    Allow up to 3 outsanding ping packets at once
     #   -w 20   Exit after 20 seconds, no matter what
     #   -Q 0x10 Quality of Service set to Low Latency
-    cmd = "ping -q -n -l 3 -w 20 -Q 0x10 %s | grep ^rtt"  % ip
+    cmd = "/bin/bash -c 'ping -q -n -l 3 -w 20 -Q 0x10 %s | grep ^rtt'"  % ip
     p = os.popen(cmd)
     s = p.read().strip()
     p.close()
