@@ -2,61 +2,48 @@
 # Query the current ADSL WAN sync speed of my ZyXEL ADSL Modem
 
 def get_up_and_down_sync_rates():
+    username="admin"
     password=""
-    modem_ip="192.168.1.1"
+    modem_ip="192.168.1.254"
+
+    import telnetlib
 
     up = None
     down = None
 
     try:
-        import socket
-        import time
+        c = telnetlib.Telnet(modem_ip)
 
-        sock = socket.socket()
+        c.read_until("Login: ")
+        c.write(username+"\n")
 
-        for i in range(10):
-            try:
-                sock.connect( (modem_ip, 23) )
-                break
-            except socket.error, e:
-                if e.args[0] == 111:
-                    # 111: Connection refused
-                    time.sleep(1)
-        else:
-            # Did not break
-            return ("U", "U")
+        c.read_until("Password: ")
+        c.write(password+"\n")
 
-        sock.sendall(password+"\nwan adsl chandata\nexit\n")
-        s = ""
-        while "far-end fast channel bit rate: " not in s:
-            p = sock.recv(4096)
-            if p == "": break
-            s += p
-            time.sleep(0.02)
-        sock.shutdown(socket.SHUT_WR|socket.SHUT_RD)
-        sock.close()
+        c.read_until("admin> ")
+        c.write("port a1 show\n")
 
-        for line in s.replace("\r", "").split("\n"):
-            rate = None
-            try:
-                rate = int(line.split(":")[1].replace(" kbps", "").strip())
-            except: pass
+        # Example output:
+        #
+        # LocalFastChannelRxRate                             = 3264000
+        # LocalFastChannelTxRate                             = 448000
 
-            if line.startswith("near-end"):
-                down = max(down, rate)
-            if line.startswith("far-end"):
-                up = max(up, rate)
+        c.read_until("LocalFastChannelRxRate                             = ")
+        down = c.read_until("\n").strip()
 
-    except EOFError:
-        tn.close()
+        c.read_until("LocalFastChannelTxRate                             = ")
+        up = c.read_until("\n").strip()
+
+    finally:
+        c.close()
 
     if up:
-        up = int(up)
+        up = int(up) / 1024     # B/s -> kB/s
     else:
         up = "U"
 
     if down:
-        down = int(down)
+        down = int(down) / 1024 # B/s -> kB/s
     else:
         down = "U"
 
