@@ -66,11 +66,14 @@ do
     # Start time
     TIMESTAMP=$(date +%s)   # e.g. 1279396108
 
-    # Run all scripts in parallel, and redirect their STDOUT
-    ./get_sync_rates.py > .last_sync_rates &
-    ./get_gw_ping.py > .last_gw_ping &
+    # Run scripts in parallel, and redirect their STDOUT
     ./get_plusnet_stable_rate.py > .last_plusnet_stable_rate &
-    ./get_wan_usage.py > .last_wan_usage &
+
+    # (Cannot run these in parallel, since the router doesn't like multiple 
+    # telnet sessions)
+    ./get_sync_rates.py > .last_sync_rates
+    ./get_wan_usage.py > .last_wan_usage
+    ./get_gw_ping.py > .last_gw_ping
 
     wait
 
