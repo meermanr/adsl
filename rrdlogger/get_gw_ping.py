@@ -50,9 +50,9 @@ def get_avg_ping_gw():
     #   -q      Quiet (only header + summary lines)
     #   -n      Numeric (don't perform reverse DNS)
     #   -l 3    Allow up to 3 outsanding ping packets at once
-    #   -w 20   Exit after 20 seconds, no matter what
+    #   -w 15   Exit after 20 seconds, no matter what
     #   -Q 0x10 Quality of Service set to Low Latency
-    cmd = "/bin/bash -c 'ping -q -n -l 3 -w 20 -Q 0x10 %s | grep ^rtt'"  % ip
+    cmd = "/bin/bash -c 'ping -q -n -l 3 -w 15 -Q 0x10 %s | grep ^rtt'"  % ip
     p = os.popen(cmd)
     s = p.read().strip()
     p.close()
