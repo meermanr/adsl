@@ -67,13 +67,13 @@ do
     TIMESTAMP=$(date +%s)   # e.g. 1279396108
 
     # Run scripts in parallel, and redirect their STDOUT
-    ./get_plusnet_stable_rate.py > .last_plusnet_stable_rate &
+    ./timelimit.py -t 20 ./get_plusnet_stable_rate.py > .last_plusnet_stable_rate &
 
     # (Cannot run these in parallel, since the router doesn't like multiple 
     # telnet sessions)
-    ./get_sync_rates.py > .last_sync_rates
-    ./get_wan_usage.py > .last_wan_usage
-    ./get_gw_ping.py > .last_gw_ping
+    ./timelimit.py -t 5 ./get_sync_rates.py > .last_sync_rates
+    ./timelimit.py -t 5 ./get_wan_usage.py > .last_wan_usage
+    ./timelimit.py -t 20 ./get_gw_ping.py > .last_gw_ping
 
     wait
 
