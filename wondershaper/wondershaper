@@ -34,47 +34,43 @@ fi
 # UPLINK
 
 # Set root Queuing Discipline (qdisc) to Class Based Queuing (cbq)
-tc qdisc add dev $DEV root handle 1: cbq avpkt 1000 bandwidth 1000mbit 
+tc qdisc add dev $DEV root handle 1: htb
 
 # Traffic is either headed to the gateway (i.e. internet traffic) or not.  
 # Internet uplink is scarse, so aggresively shape it. LAN uplink is plentiful, 
 # do not restrict it.
 
 # =============================================================================
-# INTERNET GATEWAY: Shape to $UPLINK speed, this prevents huge queues in the 
-# DSL modem that cause massive latency
-tc class add dev $DEV parent 1: classid 1:1 cbq rate ${UPLINK}kbit \
-    allot 1500 prio 5 bounded isolated
-
-# High priority internet traffic
-tc class add dev $DEV parent 1:1 classid 1:10 cbq rate ${UPLINK}kbit \
-   allot 1600 prio 1 avpkt 1000
-# .. and its actual queue that holds the packets
-tc qdisc add dev $DEV parent 1:10 handle 10: sfq perturb 10
-
-
-# Default priority internet traffic, bulk transfers.
-tc class add dev $DEV parent 1:1 classid 1:20 cbq rate $((9*$UPLINK/10))kbit \
-   allot 1600 prio 2 avpkt 1000
-# .. and its actual queue that holds the packets
-tc qdisc add dev $DEV parent 1:20 handle 20: sfq perturb 10
-
-# Low priority traffic.
-tc class add dev $DEV parent 1:1 classid 1:30 cbq rate $((8*$UPLINK/10))kbit \
-   allot 1600 prio 2 avpkt 1000
-# .. and its actual queue that holds the packets
-tc qdisc add dev $DEV parent 1:30 handle 30: sfq perturb 10
+# LAN
+tc class add dev $DEV parent 1: classid 1:40 htb rate 1000mbit burst 1000k prio 0
+	# .. and its actual queue that holds the packets
+	tc qdisc add dev $DEV parent 1:40 handle 40: sfq perturb 10
 
 # =============================================================================
-# LAN
-tc class add dev $DEV parent 1: classid 1:40 cbq rate 1000mbit \
-    allot 1500 prio 5 borrow sharing
-tc qdisc add dev $DEV parent 1:40 handle 40: sfq perturb 10
+# INTERNET GATEWAY: Shape to $UPLINK speed, this prevents huge queues in the 
+# DSL modem that cause massive latency
+tc class add dev $DEV parent 1: classid 1:1 htb rate ${UPLINK}kbit ceil ${UPLINK}kbit burst 10k prio 1 
+
+	# High priority internet traffic
+	tc class add dev $DEV parent 1:1 classid 1:10 htb rate ${UPLINK}kbit prio 1
+		# .. and its actual queue that holds the packets
+		tc qdisc add dev $DEV parent 1:10 handle 10: sfq perturb 10
+
+
+	# Default priority internet traffic, bulk transfers.
+	tc class add dev $DEV parent 1:1 classid 1:20 htb rate 5kbit prio 2
+		# .. and its actual queue that holds the packets
+		tc qdisc add dev $DEV parent 1:20 handle 20: sfq perturb 10
+
+	# Low priority traffic.
+	tc class add dev $DEV parent 1:1 classid 1:30 htb rate 1kbit prio 3 
+		# .. and its actual queue that holds the packets
+		tc qdisc add dev $DEV parent 1:30 handle 30: sfq perturb 10
 
 # =============================================================================
 # Filters
 
-# LAN traffic -----------------------------------------------------------------
+## LAN traffic -----------------------------------------------------------------
 tc filter add dev $DEV parent 1:0 protocol ip prio 1 u32 \
     match ip dst 192.168.0.0/16 flowid 1:40
 tc filter add dev $DEV parent 1:0 protocol ip prio 1 u32 \
@@ -90,13 +86,27 @@ tc filter add dev $DEV parent 1:0 protocol ip prio 10 u32 \
 
 # ICMP (ip protocol 1) in the interactive class 1:10 so we 
 # can do measurements & impress our friends:
-tc filter add dev $DEV parent 1:0 protocol ip prio 11 u32 \
+tc filter add dev $DEV parent 1: protocol ip prio 10 u32 \
         match ip protocol 1 0xff flowid 1:10
+
+# Rob's Xbox360 (reserved IP 192.168.1.8) is high priority, becuase most of its
+# traffic is interactive of streaming. (And the batch downloads it does do are
+# usually pathetically slow)
+tc filter add dev $DEV parent 1:0 protocol ip prio 11 u32 \
+      match ip src 192.168.1.8/32 flowid 1:10
+
+
+# Vuze (torrents) from Ikari.local (reserved IP 192.168.1.7) from TCP port
+# 42888 (manually configured as such in Vuze)
+tc filter add dev $DEV parent 1:0 protocol ip prio 11 u32 \
+      match ip src 192.168.1.7/32 \
+      match ip sport 42888 0xffff \
+      flowid 1:30
 
 # pablo.iranzo@uv.es provided a patch for the MLDonkey system
 # The MLDonkey uses small UDP packets for source propogation
 # which floods the wondershaper out.
-tc filter add dev $DEV parent 1:0 protocol ip prio 10 u32 \
+tc filter add dev $DEV parent 1:0 protocol ip prio 12 u32 \
    match ip protocol 17 0xff \
    match ip sport 4666 0xffff \
    flowid 1:30 
@@ -134,6 +144,11 @@ tc filter add dev $DEV parent 1: protocol ip prio 12 u32 \
 #	   match ip dst $a flowid 1:30
 #done
 
+# TOS High Throughput in 1:30:
+tc filter add dev $DEV parent 1:0 protocol ip prio 13 u32 \
+      match ip tos 0x8 0xff  flowid 1:30
+
+
 # Internet traffic catch-all: bulk.
 tc filter add dev $DEV parent 1: protocol ip prio 18 u32 \
    match ip dst 0.0.0.0/0 flowid 1:20
@@ -169,6 +184,6 @@ tc filter add dev $DEV parent ffff: protocol ip prio 40 u32 \
 # Internet traffic that arrives too fast should be discarded
 tc filter add dev $DEV parent ffff: protocol ip prio 50 u32 \
     match ip src 0.0.0.0/0 \
-    police rate ${DOWNLINK}kbit burst 10k drop \
+    police rate ${DOWNLINK}kbit burst 1k drop \
     flowid :1
 
