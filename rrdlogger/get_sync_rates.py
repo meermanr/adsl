@@ -3,8 +3,16 @@
 
 def get_up_and_down_sync_rates():
     username="admin"
-    password=""
+    password=None
     modem_ip="192.168.1.254"
+
+    if modem_pass is None:
+        import os
+        p = os.path.abspath( __file__ )
+        p = os.path.dirname(p)
+        p = os.path.join(p, "..", ".password")
+        with file(p, "rU") as fh:
+            modem_pass = fh.read().strip()
 
     import telnetlib
 

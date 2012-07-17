@@ -1,21 +1,18 @@
 #!/usr/bin/env python
 # Ping the upstream gateway (i.e. ISP)
+import config
 
 def get_gateway_ip():
-    username="admin"
-    password=""
-    modem_ip="192.168.1.254"
-
     import telnetlib
 
     try:
-        c = telnetlib.Telnet(modem_ip)
+        c = telnetlib.Telnet(config.modem_ip)
 
         c.read_until("Login: ")
-        c.write(username+"\n")
+        c.write(config.modem_user+"\n")
 
         c.read_until("Password: ")
-        c.write(password+"\n")
+        c.write(config.modem_pass+"\n")
 
         c.read_until("admin> ")
         c.write("transport show wanlink\n")

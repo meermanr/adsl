@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+# vim: set expandtab autoindent tabstop=4 softtabstop=4 shiftwidth=4:
+import config
 
 def get_ip_profile():
 	import os
@@ -7,8 +9,9 @@ def get_ip_profile():
 
 	base_cmd = [
 			"curl", "https://portal.plus.net/my.html?action=stable_rate",
-			"--data", "username=meerman&authentication_realm=portal.plus.net&password=portgentil&x=21&y=15",
-            "--silent",
+			"--data", "username={0}&authentication_realm=portal.plus.net&password={1}&x=21&y=15".format(
+				config.plusnet_user, config.plusnet_pass),
+			"--silent",
 			]
 
 	os.chdir( os.path.dirname( __file__ ) )

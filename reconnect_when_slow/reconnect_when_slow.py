@@ -1,11 +1,19 @@
 #!/usr/bin/env python
 
 modem_ip = "192.168.1.1"
-modem_pass = ""
+modem_pass = None
 sync_down_lower_limit = 2500
 
 import re
 import sys
+
+if modem_pass is None:
+    import os
+    p = os.path.abspath( __file__ )
+    p = os.path.dirname(p)
+    p = os.path.join(p, "..", ".password")
+    with file(p, "rU") as fh:
+        modem_pass = fh.read().strip()
 
 def shell(cmd):
 	import os
