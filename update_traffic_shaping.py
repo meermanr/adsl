@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# vim: set expandtab autoindent tabstop=4 softtabstop=4 shiftwidth=4:
 
 from get_plusnet_stable_rate import get_ip_profile
 from get_sync_rates import get_up_and_down_sync_rates

@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# vim: set expandtab autoindent tabstop=4 softtabstop=4 shiftwidth=4:
 # Query the current ADSL WAN sync speed of my ZyXEL ADSL Modem
 
 def get_up_and_down_sync_rates():

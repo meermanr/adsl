@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# vim: set expandtab autoindent tabstop=4 softtabstop=4 shiftwidth=4:
 """
 Run a given command and kill it after a specified amount of time (unless it has 
 exited of its own accord). If the command is killed the process will exit with 

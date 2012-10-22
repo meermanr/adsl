@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# vim: set expandtab autoindent tabstop=4 softtabstop=4 shiftwidth=4:
 import os
 
 s = os.path.abspath( __file__ )

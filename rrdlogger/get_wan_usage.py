@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# vim: set expandtab autoindent tabstop=4 softtabstop=4 shiftwidth=4:
 # Ping the upstream gateway (i.e. ISP)
 
 import config
