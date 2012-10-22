@@ -2,59 +2,59 @@
 # vim: set expandtab autoindent tabstop=4 softtabstop=4 shiftwidth=4:
 # Query the current ADSL WAN sync speed of my ZyXEL ADSL Modem
 
+import re
+import socket
+import subprocess
+
+from textwrap import dedent
+
+lHeadings = [
+        ("DSP Firmware Version", "firmware"),
+        ("Connected", "online"),
+        ("Operational Mode", "mode"),
+        ("Upstream", "up"),
+        ("Downstream", "down"),
+        ("Elapsed Time", "duration"),
+        ("SNR Margin(Upstream)", "noise_up"),
+        ("SNR Margin(Downstream)", "noise_down"),
+        ("Line Attenuation(Upstream)", "attn_up"),
+        ("Line Attenuation(Downstream)", "attn_down"),
+        ("CRC Errors(Upstream)", "errors_up"),
+        ("CRC Errors(Downstream)", "errors_down"),
+        ]
+lPatterns = []
+for rTitle, rKey in lHeadings:
+    rPattern = """<tr><td class="title"[^>]*>{0}</td><td>(?P<{1}>[^<]*)</td></tr>""".format(
+            re.escape(rTitle),
+            rKey,
+            )
+    lPatterns.append( rPattern )
+
+rPattern = ".*?".join( lPatterns )
+sPatternExtract = re.compile(rPattern)
+
 def get_up_and_down_sync_rates():
-    username="admin"
-    password=None
-    modem_ip="192.168.1.254"
+    import config
 
-    if modem_pass is None:
-        import os
-        p = os.path.abspath( __file__ )
-        p = os.path.dirname(p)
-        p = os.path.join(p, "..", ".password")
-        with file(p, "rU") as fh:
-            modem_pass = fh.read().strip()
+    html = subprocess.Popen(
+            ["curl",
+                "--silent",
+                "http://{0}/status/adslstatus.html".format(config.modem_ip),
+                "--user",
+                "{0}:{1}".format( config.modem_user, config.modem_pass),
+                ],
+            stdout=subprocess.PIPE,
+            ).stdout.read().strip().replace("\n", "")
 
-    import telnetlib
+    dValues = sPatternExtract.search(html).groupdict()
 
-    up = None
-    down = None
+    up = "U"
+    down = "U"
+    if dValues["up"]:
+        up = int(dValues["up"]) / 1024     # B/s -> kB/s
 
-    try:
-        c = telnetlib.Telnet(modem_ip)
-
-        c.read_until("Login: ")
-        c.write(username+"\n")
-
-        c.read_until("Password: ")
-        c.write(password+"\n")
-
-        c.read_until("admin> ")
-        c.write("port a1 show\n")
-
-        # Example output:
-        #
-        # LocalFastChannelRxRate                             = 3264000
-        # LocalFastChannelTxRate                             = 448000
-
-        c.read_until("LocalFastChannelRxRate                             = ")
-        down = c.read_until("\n").strip()
-
-        c.read_until("LocalFastChannelTxRate                             = ")
-        up = c.read_until("\n").strip()
-
-    finally:
-        c.close()
-
-    if up:
-        up = int(up) / 1024     # B/s -> kB/s
-    else:
-        up = "U"
-
-    if down:
-        down = int(down) / 1024 # B/s -> kB/s
-    else:
-        down = "U"
+    if dValues["down"]:
+        down = int(dValues["down"]) / 1024 # B/s -> kB/s
 
     return (up, down)
 
