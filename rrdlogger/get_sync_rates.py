@@ -33,7 +33,7 @@ for rTitle, rKey in lHeadings:
 rPattern = ".*?".join( lPatterns )
 sPatternExtract = re.compile(rPattern)
 
-def get_up_and_down_sync_rates():
+def get_adsl_status():
     import config
 
     html = subprocess.Popen(
@@ -47,6 +47,11 @@ def get_up_and_down_sync_rates():
             ).stdout.read().strip().replace("\n", "")
 
     dValues = sPatternExtract.search(html).groupdict()
+
+    return dValues
+
+def get_up_and_down_sync_rates():
+    dValues = get_adsl_status()
 
     up = "U"
     down = "U"
