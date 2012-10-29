@@ -1,35 +1,40 @@
-#!/bin/bash
+#!/bin/bash -e
 
 DB=adsl.rrd
 
-# 2 weeks @ 5min accuracy = 2 * 7 * 24 * 12 * (5min) readings = 4032 x 1
-# 4 weeks @ 1hour accuracy = 4 * 7 * 24 * (12 * 5min) readings = 672 x 12
-# 2 months @ 1 day accuracy = 2 * 4 * 7 * (24 * 12 * 5min) readings =  56 x 288
-# 6 months @ 3 day accuracy = 6 * 4 * 2 * (3.5 * 24 * 12 * 5min) readings = 48 x 1008
-# 1 year @ 1 week accuracy = 12 * 4 * (7 * 24 * 12 * 5min) readings = 48 x 2016
-# 10 years @ 1 month accuracy = 10 * 12 * (4 * 7 * 24 * 12 * 5min) readings = 120 x 8064
+# 10 weeks @ 5min accuracy = 10 * 7 * 24 * 12 * (5min) readings = 20160 x 1
+# 1 year @ 1hour accuracy = 365 * 24 * (12 * 5min) readings = 8760 x 12
+# 10 years @ 1day accuracy = 10 * 365 * (24 * 12 * 5min) readings = 3650 x 288
+#
+# Note that session_lastchange holds a copy of sys_uptime as it was when ADSL 
+# session last changed state (i.e. reconnected). Hence its value only changes 
+# when the session drops.
 if [ ! -e $DB ]
 then
 	rrdtool create $DB \
 		--step 300 \
-		DS:sync_down:GAUGE:600:0:8000 \
-		DS:sync_up:GAUGE:600:0:1000 \
-		DS:ip_profile:GAUGE:600:0:8000 \
+		DS:sync_down:GAUGE:300:0:8000000 \
+		DS:sync_up:GAUGE:300:0:1000000 \
+		DS:wan_down:COUNTER:300:0:U \
+		DS:wan_up:COUNTER:300:0:U \
+        DS:attn_down:GAUGE:300:0:U \
+        DS:attn_up:GAUGE:300:0:U \
+        DS:snr_down:GAUGE:300:0:U \
+        DS:snr_up:GAUGE:300:0:U \
+        DS:sys_uptime:COUNTER:300:0:U \
+        DS:session_lastchange:GAUGE:300:0:U \
+		DS:ip_profile:GAUGE:900:0:8000 \
 		DS:gw_ping:GAUGE:600:0:U \
-		DS:wan_down:COUNTER:600:0:U \
-		DS:wan_up:COUNTER:600:0:U \
-		RRA:MIN:0.5:1:4032 \
-		RRA:MIN:0.5:12:672 \
-		RRA:MIN:0.5:288:56 \
-		RRA:MIN:0.5:1008:56 \
-		RRA:MIN:0.5:2016:48 \
-		RRA:MIN:0.5:8064:120 \
-		RRA:MAX:0.5:1:4032 \
-		RRA:MAX:0.5:12:672 \
-		RRA:MAX:0.5:288:56 \
-		RRA:MAX:0.5:1008:56 \
-		RRA:MAX:0.5:2016:48 \
-		RRA:MAX:0.5:8064:120
+		DS:temp:GAUGE:600:-50:50 \
+        RRA:MIN:0.9:1:20160 \
+        RRA:MIN:0.9:12:8760 \
+        RRA:MIN:0.9:288:3650 \
+        RRA:AVERAGE:0.5:1:20160 \
+        RRA:AVERAGE:0.5:12:8760 \
+        RRA:AVERAGE:0.5:288:3650 \
+        RRA:MAX:0.9:1:20160 \
+        RRA:MAX:0.9:12:8760 \
+        RRA:MAX:0.9:288:3650
 fi
 
 # RRD does not require that all data stores (DS) be updated at once, but in 
@@ -54,13 +59,10 @@ fi
 # Each DS has 3x UNKNOWN and 1x value, thus each DS has >50% UNKNOWN and will 
 # be ignored by `rrdtool graph` et al.
 #
-# One obvious solution is not to use the "N", but rather record the time as 
-# TIME==0 and use that in all 4x `rrdtool update` invokations. This works, but 
-# slightly misrepresents reality - if DS1 takes 20 seconds to retrieve / 
-# calculate then DS2's measurement will only begin 20s after the recorded time!
-#
-# A better solution is to measure all DS in parallel and then update the RRD 
-# with a single invokation.
+# The obvious solution is not to use the "N" time specifier, but rather an 
+# explicit time. Care is still needed to avoid filling the database with 
+# unknown value, so we store all the metrics at once. To minimise error we 
+# attempt to collect metrics in parallel.
 while true
 do
     # Start time
@@ -68,29 +70,26 @@ do
 
     # Run scripts in parallel, and redirect their STDOUT
     ./timelimit.py -t 20 ./get_plusnet_stable_rate.py > .last_plusnet_stable_rate &
-
-    # (Cannot run these in parallel, since the router doesn't like multiple 
-    # telnet sessions)
-    ./timelimit.py -t 5 ./get_sync_rates.py > .last_sync_rates
-    ./timelimit.py -t 5 ./get_wan_usage.py > .last_wan_usage
-    ./timelimit.py -t 20 ./get_gw_ping.py > .last_gw_ping
+    ./timelimit.py -t 20 ./get_adsl_data.py > .last_adsl_data &
+    ./timelimit.py -t 20 ./get_gw_ping.py > .last_gw_ping &
+    ./timelimit.py -t 20 ./get_temp.sh > .last_temp &
 
     wait
 
-    SYNC=$(cat .last_sync_rates)
-    PING=$(cat .last_gw_ping)
+    ADSL=$(cat .last_adsl_data)
     BRAS=$(cat .last_plusnet_stable_rate)
-    WANU=$(cat .last_wan_usage)
+    PING=$(cat .last_gw_ping)
+    TEMP=$(cat .last_temp)
 
-    [ -z "$SYNC" ] && SYNC="U:U"
-    [ -z "$PING" ] && PING="U"
+    [ -z "$ADSL" ] && SYNC="U:U:U:U:U:U:U:U:U:U"
     [ -z "$BRAS" ] && BRAS="U"
-    [ -z "$WANU" ] && WANU="U:U"
+    [ -z "$PING" ] && PING="U"
+    [ -z "$TEMP" ] && TEMP="U"
 
     # Update all RRD DS at once
     rrdtool update $DB \
-        -t sync_up:sync_down:gw_ping:ip_profile:wan_up:wan_down \
-        $TIMESTAMP:$SYNC:$PING:$BRAS:$WANU
+		-t sync_down:sync_up:wan_down:wan_up:attn_down:attn_up:snr_down:snr_up:sys_uptime:session_lastchange:ip_profile:gw_ping:temp \
+        $TIMESTAMP:$ADSL:$BRAS:$PING:$TEMP
 
         # Sleep for half the RRD's step interval, effectively feeding the RRD 
         # samples at double its internal sampling rate.

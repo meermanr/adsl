@@ -1,10 +1,10 @@
 *.pyc
 adsl.rrd
 supervise/
+.last_adsl_data
 .last_gw_ping
 .last_plusnet_stable_rate
-.last_sync_rates
-.last_wan_usage
+.last_temp
 .modem_ip
 .modem_user
 .modem_pass
