@@ -29,6 +29,7 @@ adsl = [
     "CDEF:attn_up=attn_up_db,10000,*",
     "CDEF:snr_down=snr_down_db,10000,*",
     "CDEF:snr_up=snr_up_db,10000,*",
+    "CDEF:temp=temp_c,100000,*",
 
 	"AREA:sync_down#ffcc99:Connection speed (bit/s)",
 	"AREA:wan_down#009900:Download use (bit/s)",
@@ -39,6 +40,7 @@ adsl = [
     "LINE:attn_up#9999ff:Atn Up (dB):dashes",
     "LINE:snr_down#00ffff:SnR Down (dB)",
     "LINE:snr_up#00ffff:SnR Up (dB):dashes",
+    "LINE:temp#ff00ff:Temperature (C)",
     ]
 
 periods = [
@@ -62,8 +64,8 @@ for title, start, end in periods:
         "--start", start,
         "--end", end,
         "--vertical-label", "bit/s",
-        "--right-axis", "0.000001:0",
-        "--right-axis-label", "dB",
+        "--right-axis", "0.00001:0",
+        "--right-axis-label", "dB or C",
         "--title", title,
         "--lower-limit", "-1000000",
         "--upper-limit", "6000000",
