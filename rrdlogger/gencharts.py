@@ -77,4 +77,5 @@ for title, start, end in periods:
         ] + adsl
     subprocess.check_call(cmd)
 
+print "<img src='http://www.thinkbroadband.com/ping/share-large/e70bac4c482ae6dafcc89986e3447a3c.png'/>"
 print "</body></html>"
