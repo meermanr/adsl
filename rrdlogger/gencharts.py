@@ -69,7 +69,7 @@ for title, start, end in periods:
         "--title", title,
         "--lower-limit", "-1000000",
         "--upper-limit", "6000000",
-        # "--rigid",
+        "--rigid",      # Do not accommodate values > upper-limit
         "--width", "480",
         "--height", "200",
         "--imgformat", "PNG",
