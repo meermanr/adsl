@@ -4,18 +4,22 @@ import subprocess
 
 import config
 
-snmp_table = [
-    ["sync_down",   "transmission.94.1.1.4.1.2.3"],                 # Counter32, Bits
-    ["sync_up",     "transmission.94.1.1.5.1.2.3"],                 # Counter32, Bits
-    ["wan_down",    "interfaces.ifTable.ifEntry.ifInOctets.5"],     # Counter32, Octets
-    ["wan_up",      "interfaces.ifTable.ifEntry.ifOutOctets.5"],    # Counter32, Octets
-    ["attn_down",   "transmission.94.1.1.2.1.5.3"],                 # Guage32 dB, 440 = 44.0dB
-    ["attn_up",     "transmission.94.1.1.3.1.5.3"],                 # Guage32 dB, 250 = 25.0dB
-    ["snr_down",    "transmission.94.1.1.2.1.4.3"],                 # Guage32 dB, 150 = 15.0dB
-    ["snr_up",      "transmission.94.1.1.3.1.4.3"],                 # Guage32 dB, 220 = 22.0dB
+# See http://www.alvestrand.no/objectid/1.3.6.1.2.1.html
 
-    ["sys_uptime",        "system.sysUpTime.sysUpTimeInstance"],           # Timeticks, 143522276 = 16 days, 14:40:22.76
-    ["session_lastchange",   "interfaces.ifTable.ifEntry.ifLastChange.5"],    # Timeticks, 136924675 = 15 days, 20:20:46.75
+SNMP_TRANSMISSION = "1.3.6.1.2.1.10"
+
+snmp_table = [
+    ["sync_down",   SNMP_TRANSMISSION+".94.1.1.4.1.2.3"],                 # Counter32, Bits
+    ["sync_up",     SNMP_TRANSMISSION+".94.1.1.5.1.2.3"],                 # Counter32, Bits
+    ["wan_down",    "1.3.6.1.2.1.2.2.1.10.5"],                            # Counter32, Octets
+    ["wan_up",      "1.3.6.1.2.1.2.2.1.16.5"],                            # Counter32, Octets
+    ["attn_down",   SNMP_TRANSMISSION+".94.1.1.2.1.5.3"],                 # Guage32 dB, 440 = 44.0dB
+    ["attn_up",     SNMP_TRANSMISSION+".94.1.1.3.1.5.3"],                 # Guage32 dB, 250 = 25.0dB
+    ["snr_down",    SNMP_TRANSMISSION+".94.1.1.2.1.4.3"],                 # Guage32 dB, 150 = 15.0dB
+    ["snr_up",      SNMP_TRANSMISSION+".94.1.1.3.1.4.3"],                 # Guage32 dB, 220 = 22.0dB
+
+    ["sys_uptime",        "1.3.6.1.2.1.1.3.0"],                           # Timeticks, 143522276 = 16 days, 14:40:22.76
+    ["session_lastchange",   "1.3.6.1.2.1.2.2.1.9.5"],                    # Timeticks, 136924675 = 15 days, 20:20:46.75
     ]
 
 def get_adsl_data():
