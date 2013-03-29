@@ -22,7 +22,7 @@ adsl = [
     "DEF:temp_c=adsl.rrd:temp:AVERAGE",
 
 	"CDEF:ip_profile=ip_profile_kbps,1000,*",
-	"CDEF:gw_ping=gw_ping_ms,50000,*",
+	"CDEF:gw_ping=gw_ping_ms,900,TREND,50000,*",
     "CDEF:wan_down=wan_down_bytes,8,*",
     "CDEF:wan_up=wan_up_bytes,8,*,-1,*",
     "CDEF:attn_down=attn_down_db,10000,*",
@@ -31,11 +31,11 @@ adsl = [
     "CDEF:snr_up=snr_up_db,10000,*",
     "CDEF:temp=temp_c,100000,*",
 
-	"AREA:sync_down#ffcc99:Connection speed (bit/s)",
+	"AREA:sync_down#eeeeee:Connection speed (bit/s)",
 	"AREA:wan_down#009900:Download use (bit/s)",
 	"AREA:wan_up#ff0000:Upload use (bit/s)",
 	"LINE2:ip_profile#000099:ISP Limit (bit/s)",
-	"LINE:gw_ping#cc0000:Gateway Latency (1M == 20ms)",
+	"LINE:gw_ping#cc8800:Gateway Latency (1M == 20ms)",
     "LINE:attn_down#9999ff:Atn Down (dB)",
     "LINE:attn_up#9999ff:Atn Up (dB):dashes",
     "LINE:snr_down#00ffff:SnR Down (dB)",
@@ -46,12 +46,13 @@ adsl = [
 periods = [
     # [Name, Start, End]
 	["Last 8 hours", "now - 8 hours", "now"],
+	["Last 48 hours", "now - 48 hours", "now"],
 	["Today", "00:00", "23:59"],
 	["Yesterday", "00:00 - 24 hours", "23:59 - 24 hours"],
 	["This week", "00:00 Sunday", "00:00 Sunday + 1 week"],
 	["Last week", "00:00 Sunday - 1 week", "00:00 Sunday"],
-	## ["Last 4 weeks", "now - 4 week", "now"],
-	## ["Last 6 months", "now - 6 months", "now"],
+    ["Last 4 weeks", "now - 4 week", "now"],
+    ["Last 6 months", "now - 6 months", "now"],
     ]
 
 print "<html><body>"
