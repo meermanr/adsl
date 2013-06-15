@@ -1,2 +1,2 @@
 #!/bin/bash
-exec setuidgid meermanr ./update_rrd.sh
+exec setuidgid $(stat --format %U $0) ./update_rrd.sh
