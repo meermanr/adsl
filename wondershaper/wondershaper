@@ -89,19 +89,19 @@ tc filter add dev $DEV parent 1:0 protocol ip prio 10 u32 \
 tc filter add dev $DEV parent 1: protocol ip prio 10 u32 \
         match ip protocol 1 0xff flowid 1:10
 
-# Rob's Xbox360 (reserved IP 192.168.1.8) is high priority, becuase most of its
+# Rob's Xbox360 (reserved IP 192.168.1.2) is high priority, becuase most of its
 # traffic is interactive of streaming. (And the batch downloads it does do are
 # usually pathetically slow)
 tc filter add dev $DEV parent 1:0 protocol ip prio 11 u32 \
-      match ip src 192.168.1.8/32 flowid 1:10
+      match ip src 192.168.1.2/32 flowid 1:10
 
 
-# Vuze (torrents) from Ikari.local (reserved IP 192.168.1.7) from TCP port
-# 42888 (manually configured as such in Vuze)
-tc filter add dev $DEV parent 1:0 protocol ip prio 11 u32 \
-      match ip src 192.168.1.7/32 \
-      match ip sport 42888 0xffff \
-      flowid 1:30
+# # Vuze (torrents) from Ikari.local (reserved IP 192.168.1.7) from TCP port
+# # 42888 (manually configured as such in Vuze)
+# tc filter add dev $DEV parent 1:0 protocol ip prio 11 u32 \
+#       match ip src 192.168.1.7/32 \
+#       match ip sport 42888 0xffff \
+#       flowid 1:30
 
 # pablo.iranzo@uv.es provided a patch for the MLDonkey system
 # The MLDonkey uses small UDP packets for source propogation
