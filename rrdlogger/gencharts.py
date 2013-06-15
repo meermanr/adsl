@@ -64,7 +64,7 @@ periods = [
     ["Last 6 months", "now - 6 months", "now"],
     ]
 
-print "<html><body>"
+print "<html><head><title>ADSL</title></head><body>"
 print "<p>As at %s</p>" % time.strftime("%Y-%m-%d %H:%M:%S %Z", time.localtime())
 sys.stdout.flush()
 
