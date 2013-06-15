@@ -42,7 +42,7 @@ tc qdisc add dev $DEV root handle 1: htb
 
 # =============================================================================
 # LAN
-tc class add dev $DEV parent 1: classid 1:40 htb rate 1000mbit burst 1000k prio 0
+tc class add dev $DEV parent 1: classid 1:40 htb rate 100mbit burst 4096kbit prio 0
 	# .. and its actual queue that holds the packets
 	tc qdisc add dev $DEV parent 1:40 handle 40: sfq perturb 10
 
@@ -58,12 +58,12 @@ tc class add dev $DEV parent 1: classid 1:1 htb rate ${UPLINK}kbit ceil ${UPLINK
 
 
 	# Default priority internet traffic, bulk transfers.
-	tc class add dev $DEV parent 1:1 classid 1:20 htb rate 5kbit prio 2
+	tc class add dev $DEV parent 1:1 classid 1:20 htb rate $((${UPLINK}*2/3))kbit prio 2
 		# .. and its actual queue that holds the packets
 		tc qdisc add dev $DEV parent 1:20 handle 20: sfq perturb 10
 
 	# Low priority traffic.
-	tc class add dev $DEV parent 1:1 classid 1:30 htb rate 1kbit prio 3 
+	tc class add dev $DEV parent 1:1 classid 1:30 htb rate $((${UPLINK}*1/5))kbit prio 3 
 		# .. and its actual queue that holds the packets
 		tc qdisc add dev $DEV parent 1:30 handle 30: sfq perturb 10
 
