@@ -1,1 +1,0 @@
-<? system("python gencharts.py") ?>

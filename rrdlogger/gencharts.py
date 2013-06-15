@@ -1,8 +1,17 @@
 #!/usr/bin/env python
 
 import os
+import sys
+import time
+import cgitb
 import subprocess
+
 from textwrap import dedent
+
+cgitb.enable()
+print "Content-type: text/html"
+print
+sys.stdout.flush()
 
 os.umask(0002)  # Full group access
 
@@ -77,6 +86,7 @@ for title, start, end in periods:
         "--imginfo", """<img src="images/%s" width="%lu" height="%lu" alt="{0}">""".format(title)
         ] + adsl
     subprocess.check_call(cmd)
+    sys.stdout.flush()
 
 print "<img src='http://www.thinkbroadband.com/ping/share-large/e70bac4c482ae6dafcc89986e3447a3c.png'/>"
 print "</body></html>"
