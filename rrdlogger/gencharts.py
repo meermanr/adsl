@@ -65,6 +65,8 @@ periods = [
     ]
 
 print "<html><body>"
+print "<p>As at %s</p>" % time.strftime("%Y-%m-%d %H:%M:%S %Z", time.localtime())
+sys.stdout.flush()
 
 for title, start, end in periods:
     safe_title = title.replace(" ", "_")
