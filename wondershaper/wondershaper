@@ -2,9 +2,9 @@
 
 # Adapted from http://lartc.org/wondershaper/
 
+DEV=$1
 DOWNLINK=$2
 UPLINK=$3
-DEV=$1
 
 if [ "x$DEV" = "x" ]
 then
