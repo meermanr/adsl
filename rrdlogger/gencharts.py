@@ -82,6 +82,7 @@ for title, start, end in periods:
         "--lower-limit", "-1000000",
         "--upper-limit", "6000000",
         "--rigid",      # Do not accommodate values > upper-limit
+        "--lazy",
         "--width", "480",
         "--height", "200",
         "--imgformat", "PNG",
