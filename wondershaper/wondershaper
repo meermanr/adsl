@@ -1,6 +1,8 @@
-#!/bin/sh
+#!/bin/bash -e
 
 # Adapted from http://lartc.org/wondershaper/
+
+trap "$0 $1 clear" ERR
 
 DEV=$1
 DOWNLINK=$2
@@ -8,7 +10,7 @@ UPLINK=$3
 
 if [ "x$DEV" = "x" ]
 then
-    echo "Usage: $0 (DEV) [ 'clear' | (DOWNLINK UPLINK) ]"
+    echo "Usage: $0 (DEV) [ 'clear' | (DOWNLINK kbit/s) (UPLINK kbit/s) ]"
     exit 0
 fi
 
@@ -30,160 +32,177 @@ then
     exit 0
 fi
 
-###############################################################################
-# UPLINK
+# Calculations
+#
+# Target latency is < 50ms. This means max burst length should be limited to 
+# 1/20th the queue's rate.
 
-# Set root Queuing Discipline (qdisc) to Class Based Queuing (cbq)
+
+LOCALIP=$(ifconfig eth0 | sed -ne 's/^.*inet addr:\([0-9.]\+\).*/\1/p')
+
+# =============================================================================
+# Queues and Classes
+# =============================================================================
+# 1: ROOT
+# |-- 1:ff LOCAL_TRAFFIC (to/from this host itself)
+# | `-- ff: (sfq)
+# |-- 1:1 INTERNET->LAN (downlink)
+# | `-- 10: (red) Drop traffic as link approaches congestion
+# `-- 1:2 LAN->INTERNET (uplink)
+#   |-- 1:21: High priority
+#   | `-- 21: (sfq)
+#   |-- 1:22: Medium priority
+#   | `-- 22: (sfq)
+#   `-- 1:23: Low priority
+#     `-- 23: (sfq) Low priority
+
+# ROOT
 tc qdisc add dev $DEV root handle 1: htb
 
-# Traffic is either headed to the gateway (i.e. internet traffic) or not.  
-# Internet uplink is scarse, so aggresively shape it. LAN uplink is plentiful, 
-# do not restrict it.
+    # LOCAL TRAFFIC
+    tc class add dev $DEV parent 1: classid 1:ff htb \
+        rate 100mbit \
+        burst $((100/20))mbit \
+        prio 0
 
-# =============================================================================
-# LAN
-tc class add dev $DEV parent 1: classid 1:40 htb rate 100mbit burst 4096kbit prio 0
-	# .. and its actual queue that holds the packets
-	tc qdisc add dev $DEV parent 1:40 handle 40: sfq perturb 10
+        # .. and its actual queue that holds the packets
+		tc qdisc add dev $DEV parent 1:ff handle ff: sfq perturb 10
 
-# =============================================================================
-# INTERNET GATEWAY: Shape to $UPLINK speed, this prevents huge queues in the 
-# DSL modem that cause massive latency
-tc class add dev $DEV parent 1: classid 1:1 htb rate ${UPLINK}kbit ceil ${UPLINK}kbit burst 10k prio 1 
+    # INTERNET->LAN (downlink)
+    tc class add dev $DEV parent 1: classid 1:1 htb \
+        rate ${DOWNLINK}kbit \
+        burst 0 \
+        prio 1
 
-	# High priority internet traffic
-	tc class add dev $DEV parent 1:1 classid 1:10 htb rate ${UPLINK}kbit prio 1
-		# .. and its actual queue that holds the packets
-		tc qdisc add dev $DEV parent 1:10 handle 10: sfq perturb 10
+        # .. and its actual queue that holds the packets
+        # Note: All values are in BYTES. It doesn't seem to accept "kbit"
+        tc qdisc add dev $DEV parent 1:1 handle 10: red \
+            limit $(($DOWNLINK*1000/8)) \
+            avpkt 1500 \
+            burst 0 \
+            min $(($DOWNLINK*1000/8 /20)) \
+            max $(($DOWNLINK*1000/8)) \
+            probability 1
 
+    # LAN->INTERNET (uplink)
+    tc class add dev $DEV parent 1: classid 1:2 htb \
+        rate ${UPLINK}kbit \
+        burst 0 \
+        prio 2
 
-	# Default priority internet traffic, bulk transfers.
-	tc class add dev $DEV parent 1:1 classid 1:20 htb rate $((${UPLINK}*2/3))kbit prio 2
-		# .. and its actual queue that holds the packets
-		tc qdisc add dev $DEV parent 1:20 handle 20: sfq perturb 10
+        # High priority
+        tc class add dev $DEV parent 1:2 classid 1:21 htb \
+            rate ${UPLINK}kbit \
+            burst $(($UPLINK /20))kbit \
+            prio 0
 
-	# Low priority traffic.
-	tc class add dev $DEV parent 1:1 classid 1:30 htb rate $((${UPLINK}*1/5))kbit prio 3 
-		# .. and its actual queue that holds the packets
-		tc qdisc add dev $DEV parent 1:30 handle 30: sfq perturb 10
+        # Medium priority
+        tc class add dev $DEV parent 1:2 classid 1:22 htb \
+            rate $((${UPLINK}*2/3))kbit \
+            burst $(($UPLINK*2/3 /20))kbit \
+            prio 1
+
+        # Low priority
+        tc class add dev $DEV parent 1:2 classid 1:23 htb \
+            rate $(($UPLINK*1/5 /20))kbit \
+            prio 2
+
+        # .. and their actual queues that hold the packets
+        tc qdisc add dev $DEV parent 1:21 handle 21: sfq perturb 1
+        tc qdisc add dev $DEV parent 1:22 handle 22: sfq perturb 1
+        tc qdisc add dev $DEV parent 1:23 handle 23: sfq perturb 1
+
 
 # =============================================================================
 # Filters
+# =============================================================================
 
-## LAN traffic -----------------------------------------------------------------
-tc filter add dev $DEV parent 1:0 protocol ip prio 1 u32 \
-    match ip dst 192.168.0.0/16 flowid 1:40
-tc filter add dev $DEV parent 1:0 protocol ip prio 1 u32 \
-    match ip dst 10.0.0.0/8 flowid 1:40
-tc filter add dev $DEV parent 1:0 protocol ip prio 1 u32 \
-    match ip dst 172.16.0.0/12 flowid 1:40
+# -----------------------------------------------------------------------------
+# Local traffic (to/from *this* host itself)
+for DIRECTION in src dst
+do
+tc filter add dev $DEV parent 1: \
+    protocol ip \
+    prio 10 \
+    u32 match ip $DIRECTION $LOCALIP/32 \
+    flowid 1:ff
+done
 
-# Internet traffic ------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# INTERNET->LAN (downlink)
+#
+# Note: We assume that LAN->LAN traffic is *not* forwarded through this host, 
+# and so we need only check the destination of a given packet. We've already 
+# taken care of this host's own traffic above.
 
-# TOS Minimum Delay (ssh, NOT scp) in 1:10:
-tc filter add dev $DEV parent 1:0 protocol ip prio 10 u32 \
-      match ip tos 0x10 0xff  flowid 1:10
+tc filter add dev $DEV parent 1: protocol ip prio 10 \
+    u32 match ip dst 192.168.0.0/16 \
+    flowid 1:1
+tc filter add dev $DEV parent 1: protocol ip prio 10 \
+    u32 match ip dst 10.0.0.0/8 \
+    flowid 1:1
+tc filter add dev $DEV parent 1: protocol ip prio 10 \
+    u32 match ip dst 172.16.0.0/12 \
+    flowid 1:1
 
-# ICMP (ip protocol 1) in the interactive class 1:10 so we 
-# can do measurements & impress our friends:
-tc filter add dev $DEV parent 1: protocol ip prio 10 u32 \
-        match ip protocol 1 0xff flowid 1:10
+# -----------------------------------------------------------------------------
+# LAN->INTERNET (uplink)
+#
+# Note: Assumes that all downlink and private traffic have already been 
+# classified, so no source checks are performed.
 
-# Rob's Xbox360 (reserved IP 192.168.1.2) is high priority, becuase most of its
-# traffic is interactive of streaming. (And the batch downloads it does do are
-# usually pathetically slow)
-tc filter add dev $DEV parent 1:0 protocol ip prio 11 u32 \
-      match ip src 192.168.1.2/32 flowid 1:10
+##
+## HIGH PRIORITY ##
+##
 
+# TOS Minimum Delay (ssh, NOT scp)
+tc filter add dev $DEV parent 1: protocol ip prio 20 \
+    u32 match ip tos 0x10 0xff \
+    flowid 1:21
 
-# # Vuze (torrents) from Ikari.local (reserved IP 192.168.1.7) from TCP port
-# # 42888 (manually configured as such in Vuze)
-# tc filter add dev $DEV parent 1:0 protocol ip prio 11 u32 \
-#       match ip src 192.168.1.7/32 \
-#       match ip sport 42888 0xffff \
-#       flowid 1:30
+# ICMP (ip protocol 1) in the interactive class so we can do measurements & 
+# impress our friends:
+tc filter add dev $DEV parent 1: protocol ip prio 20 \
+    u32 match ip protocol 1 0xff \
+    flowid 1:21
 
-# pablo.iranzo@uv.es provided a patch for the MLDonkey system
-# The MLDonkey uses small UDP packets for source propogation
-# which floods the wondershaper out.
-tc filter add dev $DEV parent 1:0 protocol ip prio 12 u32 \
-   match ip protocol 17 0xff \
-   match ip sport 4666 0xffff \
-   flowid 1:30 
-
-# prioritize small packets (<64 bytes)
-
-tc filter add dev $DEV parent 1: protocol ip prio 12 u32 \
+# Prioritize small packets (<64 bytes)
+tc filter add dev $DEV parent 1: protocol ip prio 20 u32 \
    match ip protocol 6 0xff \
    match u8 0x05 0x0f at 0 \
    match u16 0x0000 0xffc0 at 2 \
-   flowid 1:10
+   flowid 1:21
+
+# Prioritise ACK packets (but only if they are small)
+# IP protocol 6,
+# IP header length 0x5(32 bit words),
+# IP Total length 0x34 (ACK + 12 bytes of TCP options)
+# TCP ack set (bit 5, offset 33)
+tc filter add dev $DEV parent 1: protocol ip prio 20 \
+    u32 \
+        match ip protocol 6 0xff \
+        match u8 0x05 0x0f at 0 \
+        match u16 0x0000 0xffc0 at 2 \
+        match u8 0x10 0xff at 33 \
+    flowid 1:21
 
 
-#for a in $NOPRIOPORTDST
-#do
-#	tc filter add dev $DEV parent 1: protocol ip prio 14 u32 \
-#	   match ip dport $a 0xffff flowid 1:30
-#done
-#
-#for a in $NOPRIOPORTSRC
-#do
-# 	tc filter add dev $DEV parent 1: protocol ip prio 15 u32 \
-#	   match ip sport $a 0xffff flowid 1:30
-#done
-#
-#for a in $NOPRIOHOSTSRC
-#do
-# 	tc filter add dev $DEV parent 1: protocol ip prio 16 u32 \
-#	   match ip src $a flowid 1:30
-#done
-#
-#for a in $NOPRIOHOSTDST
-#do
-# 	tc filter add dev $DEV parent 1: protocol ip prio 17 u32 \
-#	   match ip dst $a flowid 1:30
-#done
+##
+## LOW PRIORITY ##
+##
 
-# TOS High Throughput in 1:30:
-tc filter add dev $DEV parent 1:0 protocol ip prio 13 u32 \
-      match ip tos 0x8 0xff  flowid 1:30
+# TOS High Throughput
+tc filter add dev $DEV parent 1: protocol ip prio 30 \
+    u32 match ip tos 0x8 0xff \
+    flowid 1:23
 
 
-# Internet traffic catch-all: bulk.
-tc filter add dev $DEV parent 1: protocol ip prio 18 u32 \
-   match ip dst 0.0.0.0/0 flowid 1:20
+##
+## NORMAL PRIORITY
+##
 
-
-###############################################################################
-# DOWNLINK
-#
-# Limit downloads to slightly less than the maximum achievable speed. This 
-# prevents a queues building up in the ISP (which is typically a huge FIFO), 
-# and so reduces round-trip time; effectively reducing latency.
-
-# Ingress policer
-# (FYI: The term "shaping" only applied to egress traffic, "policing" is the 
-# ingress equivalent)
-
-tc qdisc add dev $DEV handle ffff: ingress
-
-# LAN traffic is exempt from policing
-tc filter add dev $DEV parent ffff: protocol ip prio 40 u32 \
-    match ip src 192.168.0.0/16 \
-    police pass \
-    flowid :1
-tc filter add dev $DEV parent ffff: protocol ip prio 40 u32 \
-    match ip src 10.0.0.0/8 \
-    police pass \
-    flowid :1
-tc filter add dev $DEV parent ffff: protocol ip prio 40 u32 \
-    match ip src 172.16.0.0/12 \
-    police pass \
-    flowid :1
-
-# Internet traffic that arrives too fast should be discarded
-tc filter add dev $DEV parent ffff: protocol ip prio 50 u32 \
-    match ip src 0.0.0.0/0 \
-    police rate ${DOWNLINK}kbit burst 1k drop \
-    flowid :1
-
+# Internet traffic catch-all. Thus rule must be tested last, and so much have 
+# the largest 'prio' value
+tc filter add dev $DEV parent 1: protocol ip prio 40 \
+    u32 match ip dst 0.0.0.0/0 \
+    flowid 1:22
