@@ -1,2 +1,2 @@
 #!/bin/bash
-exec setuidgid meermanr ./maintain_traffic_shape.py
+exec setuidgid $(stat --format %U $0) ./maintain_traffic_shape.py
