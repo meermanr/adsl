@@ -1,11 +1,12 @@
 #!/usr/bin/env python
 # vim: set expandtab autoindent tabstop=4 softtabstop=4 shiftwidth=4:
 
-import re
+import os
 import sys
+import re
+import time
 
 def shell(cmd):
-    import os
     p = os.popen(cmd)
     stdout = p.read()
     return_code = p.close()
@@ -32,9 +33,9 @@ def maintain_traffic_shape():
         print "sync_up", sync_up
         return
 
-    sync_up = int(sync_up * 0.85)
-    cmd = "sudo wondershaper eth0 %d %d" % (ip_profile, sync_up)
-    print cmd
+    ip_profile = int(ip_profile * 0.90)
+    sync_up = int(sync_up / 1000 * 0.90)
+    cmd = "sudo ../wondershaper/wondershaper eth0 %d %d" % (ip_profile, sync_up)
     shell(cmd)
 
 if __name__ == "__main__":
@@ -45,11 +46,10 @@ if __name__ == "__main__":
 
     # The interval should not be equal to `step` to prevent the logging script
     # from taking a reading during reconnection (at which time the sync rates
-    # are 0/0). Running every other step guarentees that the logger gets at
+    # are 0/0). Running every other step guarantee that the logger gets at
     # least one new and real reading between our checks.
     interval = step * 2.0
 
-    import time
     while True:
         maintain_traffic_shape()
         time.sleep(interval)
