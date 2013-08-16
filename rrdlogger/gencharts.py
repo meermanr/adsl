@@ -54,13 +54,13 @@ adsl = [
 
 periods = [
     # [Name, Start, End]
-	["Last 8 hours", "now - 8 hours", "now"],
-	["Last 48 hours", "now - 48 hours", "now"],
+	#["Last 8 hours", "now - 8 hours", "now"],
+	#["Last 48 hours", "now - 48 hours", "now"],
 	["Today", "00:00", "23:59"],
 	["Yesterday", "00:00 - 24 hours", "23:59 - 24 hours"],
-	["This week", "00:00 Sunday", "00:00 Sunday + 1 week"],
-	["Last week", "00:00 Sunday - 1 week", "00:00 Sunday"],
-    ["Last 4 weeks", "now - 4 week", "now"],
+	#["This week", "00:00 Sunday", "00:00 Sunday + 1 week"],
+	#["Last week", "00:00 Sunday - 1 week", "00:00 Sunday"],
+    #["Last 4 weeks", "now - 4 week", "now"],
     ["Last 6 months", "now - 6 months", "now"],
     ]
 
