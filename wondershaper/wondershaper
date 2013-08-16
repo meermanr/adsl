@@ -184,10 +184,21 @@ tc filter add dev $DEV parent 1: protocol ip prio 20 u32 \
     match u8 0x10 0xff at 33 \
     flowid 1:21
 
+# Traffic headed to robmeerman.co.uk (typically SSH proxying to else where)
+tc filter add dev $DEV parent 1: protocol ip prio 20 u32 \
+    match ip dst 85.119.82.218/32 \
+    flowid 1:21
+
 
 ##
 ## LOW PRIORITY ##
 ##
+
+# Vicky's iMac. She can't seem to control her urge to browse massive image 
+# galleries when Rob is working from home. This makes SSH sad.
+tc filter add dev $DEV parent 1: protocol ip prio 30 u32 \
+    match ip src 192.168.1.112/32 \
+    flowid 1:23
 
 # TOS High Throughput
 tc filter add dev $DEV parent 1: protocol ip prio 30 u32 \
