@@ -120,10 +120,15 @@ tc qdisc add dev $DEV root handle 1: htb
 
 # -----------------------------------------------------------------------------
 # Local traffic (to/from *this* host itself)
-for DIRECTION in src dst
+for SUBNET in 192.168.0.0/16 10.0.0.0/8 172.16.0.0/12
 do
     tc filter add dev $DEV parent 1: protocol ip prio 10 u32 \
-        match ip $DIRECTION $LOCALIP/32 \
+        match ip src $LOCALIP/32 \
+        match ip dst $SUBNET \
+        flowid 1:ff
+    tc filter add dev $DEV parent 1: protocol ip prio 10 u32 \
+        match ip dst $LOCALIP/32 \
+        match ip src $SUBNET \
         flowid 1:ff
 done
 
