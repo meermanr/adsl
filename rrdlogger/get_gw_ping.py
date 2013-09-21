@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # vim: set expandtab autoindent tabstop=4 softtabstop=4 shiftwidth=4:
 # Ping the upstream gateway (i.e. ISP)
+import sys
 import config
 
 def get_gateway_ip():
@@ -34,7 +35,12 @@ def get_gateway_ip():
         # Port                 : a1
 
         c.read_until("NCPRemote Addr       : ")
-        return c.read_until("\n").strip()
+        ip = c.read_until("\n").strip()
+
+        if sys.stdout.isatty():
+            print "Gateway IP:", ip
+
+        return ip
 
     finally:
         c.close()
