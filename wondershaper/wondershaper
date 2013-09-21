@@ -69,7 +69,7 @@ tc qdisc add dev $DEV root handle 1: htb
 		tc qdisc add dev $DEV parent 1:ff handle ff: sfq perturb 10
 
     # INTERNET->LAN (downlink)
-    tc class add dev $DEV parent 1: classid 1:10 htb \
+    tc class add dev $DEV parent 1: classid 1:1 htb \
         rate ${DOWNLINK}kbit \
         burst $(($DOWNLINK/20))kbit \
         prio 10
