@@ -2,11 +2,18 @@
 
 # Adapted from http://lartc.org/wondershaper/
 
-trap "$0 $1 clear" ERR
-
 DEV=$1
 DOWNLINK=$2
 UPLINK=$3
+
+# The following fudge factors allow you to express the usable % of your link.  
+#
+# Experimentation has shown that ~75% of the author's ADSL downlink can be used 
+# before upstream congestion starts to affect round-trip times. In other words, 
+# by throttling our download speeds we can ensure that our ISP does not queue 
+# any packs on our behalf, giving us full control over congestion.
+DOWNFACTOR='74/100'
+UPFACTOR='75/100'
 
 if [ "x$DEV" = "x" ]
 then
@@ -17,7 +24,13 @@ fi
 # Display status when DOWNLINK/UPLINK are ommitted
 if [ "x$DOWNLINK" = "x" ]
 then
-    tc -s qdisc ls dev $DEV
+    #echo "--------------------------------------------------------------------------------"
+    #iptables -nvL -t mangle
+    #echo "--------------------------------------------------------------------------------"
+    tc -s filter ls dev $DEV
+    echo "--------------------------------------------------------------------------------"
+    #tc -s qdisc ls dev $DEV
+    #echo "--------------------------------------------------------------------------------"
     tc -s class ls dev $DEV
     exit 0
 fi
@@ -26,11 +39,19 @@ fi
 tc qdisc del dev $DEV root    2> /dev/null > /dev/null || true
 tc qdisc del dev $DEV ingress 2> /dev/null > /dev/null || true
 
+# Flush and delete all mangle rules
+iptables -F 
+iptables -X 
+iptables -t mangle -F 
+iptables -t mangle -X 
+
 if [ "x$DOWNLINK" = "xclear" ]
 then
     echo "Cleared traffic rules on $DEV"
     exit 0
 fi
+
+trap "$0 $1 clear" ERR
 
 # Calculations
 #
@@ -63,55 +84,73 @@ tc qdisc add dev $DEV root handle 1: htb
     tc class add dev $DEV parent 1: classid 1:ff htb \
         rate 100mbit \
         burst $((100/20))mbit \
-        prio 0
+        cburst $((100/20))mbit \
+        prio 1
 
         # .. and its actual queue that holds the packets
 		tc qdisc add dev $DEV parent 1:ff handle ff: sfq perturb 10
 
     # INTERNET->LAN (downlink)
     tc class add dev $DEV parent 1: classid 1:1 htb \
-        rate ${DOWNLINK}kbit \
-        burst $(($DOWNLINK/20))kbit \
+        rate $(($DOWNLINK*$DOWNFACTOR))kbit \
+        ceil $(($DOWNLINK*$DOWNFACTOR))kbit \
+        burst $(($DOWNLINK*$DOWNFACTOR/20))kbit \
+        cburst $(($DOWNLINK*$DOWNFACTOR/20))kbit \
         prio 10
 
         # .. and its actual queue that holds the packets
         # Note: All values are in BYTES. It doesn't seem to accept "kbit"
-        tc qdisc add dev $DEV parent 1:10 handle 10: red \
-            limit $(($DOWNLINK*1000/8)) \
+        #
+        # The burst calculation needs to be increased by one so as to avoid an 
+        # internal assert in the qdisc (seems our target and their min 
+        # acceptable burst are one and the same)
+        tc qdisc add dev $DEV parent 1:1 handle 10: red \
+            limit $(($DOWNLINK*$DOWNFACTOR*1000/8)) \
             avpkt 1500 \
-            burst 0 \
-            min $(($DOWNLINK*1000/8 /20)) \
-            max $(($DOWNLINK*1000/8)) \
+            burst $((($DOWNLINK*1000/8/20/1500)+1)) \
+            min   $(($DOWNLINK*1000/8/20)) \
+            max   $(($DOWNLINK*$DOWNFACTOR*1000/8)) \
+            ecn \
             probability 1
 
     # LAN->INTERNET (uplink)
     tc class add dev $DEV parent 1: classid 1:2 htb \
-        rate ${UPLINK}kbit \
-        burst 0 \
-        prio 0
+        rate $(($UPLINK*$UPFACTOR))kbit \
+        ceil $(($UPLINK*$UPFACTOR))kbit \
+        burst $(($UPLINK/20))kbit \
+        cburst $(($UPLINK/20))kbit \
+        prio 20
 
         # High priority
         tc class add dev $DEV parent 1:2 classid 1:21 htb \
-            ceil ${UPLINK}kbit \
-            rate $((${UPLINK}*1/3))kbit \
+            rate $(($UPLINK*$UPFACTOR*4/6))kbit \
+            ceil $(($UPLINK*$UPFACTOR))kbit \
             prio 0
 
         # Medium priority
         tc class add dev $DEV parent 1:2 classid 1:22 htb \
-            ceil ${UPLINK}kbit \
-            rate $((${UPLINK}*1/3))kbit \
+            rate $(($UPLINK*$UPFACTOR*2/6))kbit \
+            ceil $(($UPLINK*$UPFACTOR))kbit \
             prio 1
 
         # Low priority
         tc class add dev $DEV parent 1:2 classid 1:23 htb \
-            ceil ${UPLINK}kbit \
-            rate $((${UPLINK}*1/3))kbit \
+            rate $(($UPLINK*$UPFACTOR*1/6))kbit \
             prio 2
 
         # .. and their actual queues that hold the packets
-        tc qdisc add dev $DEV parent 1:21 handle 21: sfq perturb 10
-        tc qdisc add dev $DEV parent 1:22 handle 22: sfq perturb 10
-        tc qdisc add dev $DEV parent 1:23 handle 23: sfq perturb 10
+        for ID in 21 22 23
+        do
+            tc qdisc add dev $DEV parent 1:$ID handle $ID: sfq
+            ## tc qdisc add dev $DEV parent 1:$ID handle $ID: red \
+            ##     limit $(($UPLINK*$UPFACTOR*1000/8)) \
+            ##     avpkt 1500 \
+            ##     burst $((($UPLINK*1000/8/20/1500)+1)) \
+            ##     min   $(($UPLINK*1000/8/20)) \
+            ##     max   $(($UPLINK*$UPFACTOR*1000/8)) \
+            ##     ecn \
+            ##     probability 1
+        done
 
 
 # =============================================================================
@@ -119,18 +158,13 @@ tc qdisc add dev $DEV root handle 1: htb
 # =============================================================================
 
 # -----------------------------------------------------------------------------
-# Local traffic (to/from *this* host itself)
-for SUBNET in 192.168.0.0/16 10.0.0.0/8 172.16.0.0/12
-do
-    tc filter add dev $DEV parent 1: protocol ip prio 10 u32 \
-        match ip src $LOCALIP/32 \
-        match ip dst $SUBNET \
-        flowid 1:ff
-    tc filter add dev $DEV parent 1: protocol ip prio 10 u32 \
-        match ip dst $LOCALIP/32 \
-        match ip src $SUBNET \
-        flowid 1:ff
-done
+# LOCAL TRAFFIC
+# Mark traffic generated by this host itself (INPUT + OUTPUT, but not FORWARD)
+iptables -t mangle -A INPUT  -p all -i $DEV -j MARK --set-mark 0xff
+iptables -t mangle -A OUTPUT -p all -o $DEV -j MARK --set-mark 0xff
+
+# ("fw" means the handle refers to a MARK, rather than a qdisc)
+tc filter add dev $DEV parent 1: protocol ip prio 1 handle 0xff fw classid 1:ff
 
 # -----------------------------------------------------------------------------
 # INTERNET->LAN (downlink)
@@ -139,21 +173,34 @@ done
 # and so we need only check the destination of a given packet. We've already 
 # taken care of this host's own traffic above.
 
-tc filter add dev $DEV parent 1: protocol ip prio 10 u32 \
-    match ip dst 192.168.0.0/16 \
-    flowid 1:1
-tc filter add dev $DEV parent 1: protocol ip prio 10 u32 \
-    match ip dst 10.0.0.0/8 \
-    flowid 1:1
-tc filter add dev $DEV parent 1: protocol ip prio 10 u32 \
-    match ip dst 172.16.0.0/12 \
-    flowid 1:1
+iptables -t mangle -N DOWNLINK
+iptables -t mangle -A DOWNLINK -p all -j MARK --set-mark 0x1
+tc filter add dev $DEV parent 1: protocol ip prio 2 handle 0x1 fw classid 1:1
+
+for SUBNET in 192.168.0.0/16 10.0.0.0/8 172.16.0.0/12 
+do
+    iptables -t mangle -A PREROUTING -p all -i $DEV ! -s $SUBNET -d $SUBNET -j DOWNLINK
+done
+
 
 # -----------------------------------------------------------------------------
 # LAN->INTERNET (uplink)
 #
 # Note: Assumes that all downlink and private traffic have already been 
 # classified, so no source checks are performed.
+
+iptables -t mangle -N UPLINK
+iptables -t mangle -A UPLINK -p all -j MARK --set-mark 0x22     # Default to medium priority
+#for CHAIN in PREROUTING INPUT FORWARD OUTPUT POSTROUTING DOWNLINK UPLINK
+#do
+#    iptables -t mangle -I $CHAIN -p tcp --sport 12345 -j MARK --set-mark 0/0
+#    iptables -t mangle -I $CHAIN -p tcp --dport 12345 -j MARK --set-mark 0/0
+#done
+
+for SUBNET in 192.168.0.0/16 10.0.0.0/8 172.16.0.0/12 
+do
+    iptables -t mangle -A PREROUTING -p all -i $DEV -s $SUBNET ! -d $SUBNET -j UPLINK
+done
 
 ##
 ## HIGH PRIORITY ##
@@ -194,29 +241,36 @@ tc filter add dev $DEV parent 1: protocol ip prio 20 u32 \
     match ip dst 85.119.82.218/32 \
     flowid 1:21
 
+# Traffic originating from the Xbox should be treated as urgent
+tc filter add dev $DEV parent 1: protocol ip prio 20 u32 \
+    match ip src 192.168.1.2/32 \
+    flowid 1:21
+
 
 ##
 ## LOW PRIORITY ##
 ##
 
-# Vicky's iMac. She can't seem to control her urge to browse massive image 
-# galleries when Rob is working from home. This makes SSH sad.
-tc filter add dev $DEV parent 1: protocol ip prio 30 u32 \
-    match ip src 192.168.1.112/32 \
-    flowid 1:23
+# # WiiU, while it's downloading purchases
+# tc filter add dev $DEV parent 1: protocol ip prio 30 u32 \
+#     match ip src 192.168.1.5/32 \
+#     flowid 1:23
 
 # TOS High Throughput
 tc filter add dev $DEV parent 1: protocol ip prio 30 u32 \
     match ip tos 0x8 0xff \
     flowid 1:23
 
+# If no other filter has classified the packet, then use FW markers (set by 
+# iptables -j MARK). All UPLINK packets are marked as 0x22 by default (see 
+# iptables command earlier)
+tc filter add dev $DEV parent 1: protocol ip prio 40 handle 0x21 fw classid 1:21 # High priority
+tc filter add dev $DEV parent 1: protocol ip prio 40 handle 0x22 fw classid 1:22 # Medium priority
+tc filter add dev $DEV parent 1: protocol ip prio 40 handle 0x23 fw classid 1:23 # Low priority
 
-##
-## NORMAL PRIORITY
-##
 
-# Internet traffic catch-all. Thus rule must be tested last, and so much have 
-# the largest 'prio' value
-tc filter add dev $DEV parent 1: protocol ip prio 40 u32 \
-    match ip dst 0.0.0.0/0 \
-    flowid 1:22
+# Reset counters, so that packet counts are in sync (it takes time to add 
+# rules, and during that time the first rule added may be hit, leading to 
+# confusing packet counts: "But these rules should always apply to the same 
+# packets! How can their hit count be different?"
+iptables -t mangle -Z
