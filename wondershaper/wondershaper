@@ -12,8 +12,8 @@ UPLINK=$3
 # before upstream congestion starts to affect round-trip times. In other words, 
 # by throttling our download speeds we can ensure that our ISP does not queue 
 # any packs on our behalf, giving us full control over congestion.
-DOWNFACTOR='74/100'
-UPFACTOR='75/100'
+DOWNFACTOR='68/100'
+UPFACTOR='84/100'
 
 if [ "x$DEV" = "x" ]
 then
