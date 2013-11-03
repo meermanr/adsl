@@ -91,11 +91,15 @@ tc qdisc add dev $DEV root handle 1: htb
 		tc qdisc add dev $DEV parent 1:ff handle ff: sfq perturb 10
 
     # INTERNET->LAN (downlink)
+    #
+    # NOTES: Target is 50s (1/20th of a second), so our burst and min sizes 
+    # must be smaller than this or we're too late to influence latency.  I've 
+    # chosen to use 1/40th as the lower bound.
     tc class add dev $DEV parent 1: classid 1:1 htb \
         rate $(($DOWNLINK*$DOWNFACTOR))kbit \
         ceil $(($DOWNLINK*$DOWNFACTOR))kbit \
-        burst $(($DOWNLINK*$DOWNFACTOR/20))kbit \
-        cburst $(($DOWNLINK*$DOWNFACTOR/20))kbit \
+        burst $(($DOWNLINK*$DOWNFACTOR/40))kbit \
+        cburst 1500 \
         prio 10
 
         # .. and its actual queue that holds the packets
@@ -107,10 +111,9 @@ tc qdisc add dev $DEV root handle 1: htb
         tc qdisc add dev $DEV parent 1:1 handle 10: red \
             limit $(($DOWNLINK*$DOWNFACTOR*1000/8)) \
             avpkt 1500 \
-            burst $((($DOWNLINK*1000/8/20/1500)+1)) \
-            min   $(($DOWNLINK*1000/8/20)) \
-            max   $(($DOWNLINK*$DOWNFACTOR*1000/8)) \
-            ecn \
+            burst $((($DOWNLINK*1000/8/40/1500)+1)) \
+            min   $(($DOWNLINK*1000/8/40)) \
+            max   $(($DOWNLINK*1000/8/20)) \
             probability 1
 
     # LAN->INTERNET (uplink)
