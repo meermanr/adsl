@@ -214,30 +214,34 @@ tc filter add dev $DEV parent 1: protocol ip prio 20 u32 \
     match ip tos 0x10 0xff \
     flowid 1:21
 
-# ICMP (ip protocol 1) in the interactive class so we can do measurements & 
-# impress our friends:
-tc filter add dev $DEV parent 1: protocol ip prio 20 u32 \
-    match ip protocol 1 0xff \
-    flowid 1:21
+# Disabled 2014-01-08 - just because packets are small, or ACKs, or ping, 
+# doesn't make them important. What's more, prioritising ICMP makes experiments 
+# with traffic suspect.
 
-# Prioritize small packets (<64 bytes)
-tc filter add dev $DEV parent 1: protocol ip prio 20 u32 \
-    match ip protocol 6 0xff \
-    match u8 0x05 0x0f at 0 \
-    match u16 0x0000 0xffc0 at 2 \
-    flowid 1:21
-
-# Prioritise ACK packets (but only if they are small)
-# IP protocol 6,
-# IP header length 0x5(32 bit words),
-# IP Total length 0x34 (ACK + 12 bytes of TCP options)
-# TCP ack set (bit 5, offset 33)
-tc filter add dev $DEV parent 1: protocol ip prio 20 u32 \
-    match ip protocol 6 0xff \
-    match u8 0x05 0x0f at 0 \
-    match u16 0x0000 0xffc0 at 2 \
-    match u8 0x10 0xff at 33 \
-    flowid 1:21
+##### # ICMP (ip protocol 1) in the interactive class so we can do measurements & 
+##### # impress our friends:
+##### tc filter add dev $DEV parent 1: protocol ip prio 20 u32 \
+#####     match ip protocol 1 0xff \
+#####     flowid 1:21
+##### 
+##### # Prioritize small packets (<64 bytes)
+##### tc filter add dev $DEV parent 1: protocol ip prio 20 u32 \
+#####     match ip protocol 6 0xff \
+#####     match u8 0x05 0x0f at 0 \
+#####     match u16 0x0000 0xffc0 at 2 \
+#####     flowid 1:21
+##### 
+##### # Prioritise ACK packets (but only if they are small)
+##### # IP protocol 6,
+##### # IP header length 0x5(32 bit words),
+##### # IP Total length 0x34 (ACK + 12 bytes of TCP options)
+##### # TCP ack set (bit 5, offset 33)
+##### tc filter add dev $DEV parent 1: protocol ip prio 20 u32 \
+#####     match ip protocol 6 0xff \
+#####     match u8 0x05 0x0f at 0 \
+#####     match u16 0x0000 0xffc0 at 2 \
+#####     match u8 0x10 0xff at 33 \
+#####     flowid 1:21
 
 # Traffic headed to robmeerman.co.uk (typically SSH proxying to else where)
 tc filter add dev $DEV parent 1: protocol ip prio 20 u32 \
