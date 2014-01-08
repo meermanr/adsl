@@ -12,8 +12,23 @@ UPLINK=$3
 # before upstream congestion starts to affect round-trip times. In other words, 
 # by throttling our download speeds we can ensure that our ISP does not queue 
 # any packs on our behalf, giving us full control over congestion.
-DOWNFACTOR='68/100'
-UPFACTOR='84/100'
+#
+# Methodology used: ping robmeerman.co.uk from home in one window, ping home 
+# from robmeerman.co.uk in another. Set both factors to 100/100. Run a speed 
+# test (e.g. speedtest.net), and observe if either shows a *consistent* latency 
+# above 200ms.  It's usually pretty drastic - from 22ms when idle -> 1019ms 
+# during test. Bisect DOWNFACTOR and repeat until you find the highest value 
+# which maintains acceptable latency during a speedtest. For me, the factors 
+# tried were: 100 (bad), 50 (good), 75 (good), 87.5 (bad), 81.25 (bad), 78.125 
+# (bad) and then I gave up and left it at 75 (good). Repeat process for 
+# UPFACTOR.
+#
+# It is important to do the DOWNFACTOR first because if your ISP holds a queue 
+# of traffic for us, then we cannot control round-trip time. So first we find a 
+# factor that eliminates ISP queuing, and then we can find a factor to control 
+# our own egress queuing.
+DOWNFACTOR='75/100'
+UPFACTOR='88/100'
 
 if [ "x$DEV" = "x" ]
 then
