@@ -39,13 +39,13 @@ fi
 # Display status when DOWNLINK/UPLINK are ommitted
 if [ "x$DOWNLINK" = "x" ]
 then
-    #echo "--------------------------------------------------------------------------------"
-    #iptables -nvL -t mangle
-    #echo "--------------------------------------------------------------------------------"
+    echo "--------------------------------------------------------------------------------"
+    iptables -nvL -t mangle
+    echo "--------------------------------------------------------------------------------"
     tc -s filter ls dev $DEV
     echo "--------------------------------------------------------------------------------"
-    #tc -s qdisc ls dev $DEV
-    #echo "--------------------------------------------------------------------------------"
+    tc -s qdisc ls dev $DEV
+    echo "--------------------------------------------------------------------------------"
     tc -s class ls dev $DEV
     exit 0
 fi
@@ -220,14 +220,20 @@ do
     iptables -t mangle -A PREROUTING -p all -i $DEV -s $SUBNET ! -d $SUBNET -j UPLINK
 done
 
+# Note: Use $PRIORITY and $FLOWID in the rules, so they can cut-and-paste into 
+# different priority bands without having to tediously modify all the 
+# priorty-related numbers (I've forgotten to do this a number of times!)
+
 ##
 ## HIGH PRIORITY ##
 ##
+PRIORITY=20
+FLOWID=1:21
 
 # TOS Minimum Delay (ssh, NOT scp)
-tc filter add dev $DEV parent 1: protocol ip prio 20 u32 \
+tc filter add dev $DEV parent 1: protocol ip prio $PRIORITY u32 \
     match ip tos 0x10 0xff \
-    flowid 1:21
+    flowid $FLOWID
 
 # Disabled 2014-01-08 - just because packets are small, or ACKs, or ping, 
 # doesn't make them important. What's more, prioritising ICMP makes experiments 
@@ -235,53 +241,65 @@ tc filter add dev $DEV parent 1: protocol ip prio 20 u32 \
 
 ##### # ICMP (ip protocol 1) in the interactive class so we can do measurements & 
 ##### # impress our friends:
-##### tc filter add dev $DEV parent 1: protocol ip prio 20 u32 \
+##### tc filter add dev $DEV parent 1: protocol ip prio $PRIORITY u32 \
 #####     match ip protocol 1 0xff \
-#####     flowid 1:21
+#####     flowid $FLOWID
 ##### 
 ##### # Prioritize small packets (<64 bytes)
-##### tc filter add dev $DEV parent 1: protocol ip prio 20 u32 \
+##### tc filter add dev $DEV parent 1: protocol ip prio $PRIORITY u32 \
 #####     match ip protocol 6 0xff \
 #####     match u8 0x05 0x0f at 0 \
 #####     match u16 0x0000 0xffc0 at 2 \
-#####     flowid 1:21
+#####     flowid $FLOWID
 ##### 
 ##### # Prioritise ACK packets (but only if they are small)
 ##### # IP protocol 6,
 ##### # IP header length 0x5(32 bit words),
 ##### # IP Total length 0x34 (ACK + 12 bytes of TCP options)
 ##### # TCP ack set (bit 5, offset 33)
-##### tc filter add dev $DEV parent 1: protocol ip prio 20 u32 \
+##### tc filter add dev $DEV parent 1: protocol ip prio $PRIORITY u32 \
 #####     match ip protocol 6 0xff \
 #####     match u8 0x05 0x0f at 0 \
 #####     match u16 0x0000 0xffc0 at 2 \
 #####     match u8 0x10 0xff at 33 \
-#####     flowid 1:21
+#####     flowid $FLOWID
 
 # Traffic headed to robmeerman.co.uk (typically SSH proxying to else where)
-tc filter add dev $DEV parent 1: protocol ip prio 20 u32 \
+tc filter add dev $DEV parent 1: protocol ip prio $PRIORITY u32 \
     match ip dst 85.119.82.218/32 \
-    flowid 1:21
-
-# Traffic originating from the Xbox should be treated as urgent
-tc filter add dev $DEV parent 1: protocol ip prio 20 u32 \
-    match ip src 192.168.1.2/32 \
-    flowid 1:21
+    flowid $FLOWID
 
 
 ##
 ## LOW PRIORITY ##
 ##
+PRIORITY=30
+FLOWID=1:23
+
+# Xbox 360 while it downloads videos
+tc filter add dev $DEV parent 1: protocol ip prio $PRIORITY u32 \
+    match ip src 192.168.1.225/32 \
+    flowid $FLOWID
+
+# Az Pro while it downloads Formula 1
+tc filter add dev $DEV parent 1: protocol ip prio $PRIORITY u32 \
+    match ip src 192.168.1.11/32 \
+    flowid $FLOWID
 
 # # WiiU, while it's downloading purchases
-# tc filter add dev $DEV parent 1: protocol ip prio 30 u32 \
+# tc filter add dev $DEV parent 1: protocol ip prio $PRIORITY u32 \
 #     match ip src 192.168.1.5/32 \
-#     flowid 1:23
+#     flowid $FLOWID
+
+# # Aspidistra, while it's downloading PSO
+# tc filter add dev $DEV parent 1: protocol ip prio $PRIORITY u32 \
+#     match ip src 192.168.1.30/32 \
+#     flowid $FLOWID
 
 # TOS High Throughput
-tc filter add dev $DEV parent 1: protocol ip prio 30 u32 \
+tc filter add dev $DEV parent 1: protocol ip prio $PRIORITY u32 \
     match ip tos 0x8 0xff \
-    flowid 1:23
+    flowid $FLOWID
 
 # If no other filter has classified the packet, then use FW markers (set by 
 # iptables -j MARK). All UPLINK packets are marked as 0x22 by default (see 
