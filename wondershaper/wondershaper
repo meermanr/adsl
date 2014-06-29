@@ -27,6 +27,7 @@ MEDIUM_PRIORITY=(
 LOW_PRIORITY=(
     '60:45:bd:9c:9d:bc' # Xbox 360 Slim
     '88:32:9b:02:6a:ce' # Samsung Galaxy S3, Regina
+    'b8:27:eb:8f:c0:f3' # Raspberry Pi, Flux
     )
 
 DEV=$1
