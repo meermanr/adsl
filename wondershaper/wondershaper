@@ -1,6 +1,33 @@
 #!/bin/bash -e
-
 # Adapted from http://lartc.org/wondershaper/
+
+## CONFIGURATION ##
+# Unless specified in the list below, all UPLINK traffic is medium priority.  
+# Specify source MAC addresses for device which should be subject to other 
+# priorities.
+
+HIGH_PRIORITY=(
+    '74:5e:1c:56:c2:97' # Pioneer SC-LX57
+    )
+
+# NB: Has *no* affect, just a convenient bucket for MAC address I may want to 
+# cut-and-paste into HIGH or LOW in the future
+MEDIUM_PRIORITY=(
+    '00:50:8d:9d:75:83' # Ikari (top)
+    '00:50:8d:9d:75:84' # Ikari (bottom)
+    '20:02:af:18:dc:15' # Samsung Galaxy Tab 10.1, Vicky
+    '20:02:af:44:52:79' # Samsung Galaxy Tab 10.1, Regina
+    '34:af:2c:9c:ff:fd' # Nintendo WiiU
+    '78:31:c1:be:0c:34' # Macbook Pro, Robert
+    '88:30:8a:77:03:70' # Samsung Galaxy S3, Vicky
+    'b8:e8:56:3a:cb:34' # Macbook Pro, Vicky
+    'd0:22:be:2c:26:ef' # Samsung Galaxy Note 3, Rob
+    )
+
+LOW_PRIORITY=(
+    '60:45:bd:9c:9d:bc' # Xbox 360 Slim
+    '88:32:9b:02:6a:ce' # Samsung Galaxy S3, Regina
+    )
 
 DEV=$1
 DOWNLINK=$2
@@ -41,12 +68,12 @@ if [ "x$DOWNLINK" = "x" ]
 then
     echo "--------------------------------------------------------------------------------"
     iptables -nvL -t mangle
-    echo "--------------------------------------------------------------------------------"
-    tc -s filter ls dev $DEV
-    echo "--------------------------------------------------------------------------------"
-    tc -s qdisc ls dev $DEV
-    echo "--------------------------------------------------------------------------------"
-    tc -s class ls dev $DEV
+    # echo "--------------------------------------------------------------------------------"
+    # tc -s filter ls dev $DEV
+    # echo "--------------------------------------------------------------------------------"
+    # tc -s qdisc ls dev $DEV
+    # echo "--------------------------------------------------------------------------------"
+    # tc -s class ls dev $DEV
     exit 0
 fi
 
@@ -229,45 +256,20 @@ done
 ##
 PRIORITY=20
 FLOWID=1:21
+MARK=0x21
 
 # TOS Minimum Delay (ssh, NOT scp)
 tc filter add dev $DEV parent 1: protocol ip prio $PRIORITY u32 \
     match ip tos 0x10 0xff \
     flowid $FLOWID
 
-# Disabled 2014-01-08 - just because packets are small, or ACKs, or ping, 
-# doesn't make them important. What's more, prioritising ICMP makes experiments 
-# with traffic suspect.
-
-##### # ICMP (ip protocol 1) in the interactive class so we can do measurements & 
-##### # impress our friends:
-##### tc filter add dev $DEV parent 1: protocol ip prio $PRIORITY u32 \
-#####     match ip protocol 1 0xff \
-#####     flowid $FLOWID
-##### 
-##### # Prioritize small packets (<64 bytes)
-##### tc filter add dev $DEV parent 1: protocol ip prio $PRIORITY u32 \
-#####     match ip protocol 6 0xff \
-#####     match u8 0x05 0x0f at 0 \
-#####     match u16 0x0000 0xffc0 at 2 \
-#####     flowid $FLOWID
-##### 
-##### # Prioritise ACK packets (but only if they are small)
-##### # IP protocol 6,
-##### # IP header length 0x5(32 bit words),
-##### # IP Total length 0x34 (ACK + 12 bytes of TCP options)
-##### # TCP ack set (bit 5, offset 33)
-##### tc filter add dev $DEV parent 1: protocol ip prio $PRIORITY u32 \
-#####     match ip protocol 6 0xff \
-#####     match u8 0x05 0x0f at 0 \
-#####     match u16 0x0000 0xffc0 at 2 \
-#####     match u8 0x10 0xff at 33 \
-#####     flowid $FLOWID
-
 # Traffic headed to robmeerman.co.uk (typically SSH proxying to else where)
-tc filter add dev $DEV parent 1: protocol ip prio $PRIORITY u32 \
-    match ip dst 85.119.82.218/32 \
-    flowid $FLOWID
+iptables -t mangle -A UPLINK --destination 85.119.82.218/32 -j MARK --set-mark $MARK
+
+for MAC in ${HIGH_PRIORITY[@]}
+do
+    iptables -t mangle -A UPLINK -m mac --mac-source $MAC -j MARK --set-mark $MARK
+done
 
 
 ##
@@ -275,31 +277,22 @@ tc filter add dev $DEV parent 1: protocol ip prio $PRIORITY u32 \
 ##
 PRIORITY=30
 FLOWID=1:23
-
-# Xbox 360 while it downloads videos
-tc filter add dev $DEV parent 1: protocol ip prio $PRIORITY u32 \
-    match ip src 192.168.1.225/32 \
-    flowid $FLOWID
-
-# Az Pro while it downloads Formula 1
-tc filter add dev $DEV parent 1: protocol ip prio $PRIORITY u32 \
-    match ip src 192.168.1.11/32 \
-    flowid $FLOWID
-
-# # WiiU, while it's downloading purchases
-# tc filter add dev $DEV parent 1: protocol ip prio $PRIORITY u32 \
-#     match ip src 192.168.1.5/32 \
-#     flowid $FLOWID
-
-# # Aspidistra, while it's downloading PSO
-# tc filter add dev $DEV parent 1: protocol ip prio $PRIORITY u32 \
-#     match ip src 192.168.1.30/32 \
-#     flowid $FLOWID
+MARK=0x22
 
 # TOS High Throughput
 tc filter add dev $DEV parent 1: protocol ip prio $PRIORITY u32 \
     match ip tos 0x8 0xff \
     flowid $FLOWID
+for MAC in ${LOW_PRIORITY[@]}
+do
+    iptables -t mangle -A UPLINK -m mac --mac-source $MAC -j MARK --set-mark $MARK
+done
+
+
+
+##
+## MEDIUM PRIORITY ##
+##
 
 # If no other filter has classified the packet, then use FW markers (set by 
 # iptables -j MARK). All UPLINK packets are marked as 0x22 by default (see 
