@@ -61,7 +61,9 @@ periods = [
 	#["This week", "00:00 Sunday", "00:00 Sunday + 1 week"],
 	#["Last week", "00:00 Sunday - 1 week", "00:00 Sunday"],
     #["Last 4 weeks", "now - 4 week", "now"],
+    ["Last 7 days", "now - 7 days", "now"],
     ["Last 6 months", "now - 6 months", "now"],
+    ["Last 2 years", "now - 2 years", "now"],
     ]
 
 print "<html><head><title>ADSL</title></head><body>"
@@ -83,7 +85,7 @@ for title, start, end in periods:
         "--upper-limit", "6000000",
         "--rigid",      # Do not accommodate values > upper-limit
         "--lazy",
-        "--width", "480",
+        "--width", "1024",
         "--height", "200",
         "--imgformat", "PNG",
         "--imginfo", """<img src="images/%s" width="%lu" height="%lu" alt="{0}">""".format(title)
