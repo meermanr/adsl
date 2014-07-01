@@ -101,9 +101,6 @@ trap "$0 $1 clear" ERR
 # Target latency is < 50ms. This means max burst length should be limited to 
 # 1/20th the queue's rate.
 
-
-LOCALIP=$(ifconfig eth0 | sed -ne 's/^.*inet addr:\([0-9.]\+\).*/\1/p')
-
 # =============================================================================
 # Queues and Classes
 # =============================================================================
@@ -118,7 +115,7 @@ LOCALIP=$(ifconfig eth0 | sed -ne 's/^.*inet addr:\([0-9.]\+\).*/\1/p')
 #   |-- 1:22: Medium priority
 #   | `-- 22: (sfq)
 #   `-- 1:23: Low priority
-#     `-- 23: (sfq) Low priority
+#     `-- 23: (sfq)
 
 # ROOT
 tc qdisc add dev $DEV root handle 1: htb
@@ -135,9 +132,14 @@ tc qdisc add dev $DEV root handle 1: htb
 
     # INTERNET->LAN (downlink)
     #
-    # NOTES: Target is 50s (1/20th of a second), so our burst and min sizes 
+    # NOTES: Target is 50ms (1/20th of a second), so our burst and min sizes 
     # must be smaller than this or we're too late to influence latency.  I've 
     # chosen to use 1/40th as the lower bound.
+    #
+    # cburst should be set the network's Maximum Transmission Unit (MTU), or 
+    # bad things happen - presumably the packets are fragmented, increasing 
+    # overheads and processing cost. Regardless, performance was poor when this 
+    # was less than MTU.
     tc class add dev $DEV parent 1: classid 1:1 htb \
         rate $(($DOWNLINK*$DOWNFACTOR))kbit \
         ceil $(($DOWNLINK*$DOWNFACTOR))kbit \
@@ -188,14 +190,6 @@ tc qdisc add dev $DEV root handle 1: htb
         for ID in 21 22 23
         do
             tc qdisc add dev $DEV parent 1:$ID handle $ID: sfq
-            ## tc qdisc add dev $DEV parent 1:$ID handle $ID: red \
-            ##     limit $(($UPLINK*$UPFACTOR*1000/8)) \
-            ##     avpkt 1500 \
-            ##     burst $((($UPLINK*1000/8/20/1500)+1)) \
-            ##     min   $(($UPLINK*1000/8/20)) \
-            ##     max   $(($UPLINK*$UPFACTOR*1000/8)) \
-            ##     ecn \
-            ##     probability 1
         done
 
 
@@ -237,11 +231,6 @@ done
 
 iptables -t mangle -N UPLINK
 iptables -t mangle -A UPLINK -p all -j MARK --set-mark 0x22     # Default to medium priority
-#for CHAIN in PREROUTING INPUT FORWARD OUTPUT POSTROUTING DOWNLINK UPLINK
-#do
-#    iptables -t mangle -I $CHAIN -p tcp --sport 12345 -j MARK --set-mark 0/0
-#    iptables -t mangle -I $CHAIN -p tcp --dport 12345 -j MARK --set-mark 0/0
-#done
 
 for SUBNET in 192.168.0.0/16 10.0.0.0/8 172.16.0.0/12 
 do
@@ -284,6 +273,7 @@ MARK=0x22
 tc filter add dev $DEV parent 1: protocol ip prio $PRIORITY u32 \
     match ip tos 0x8 0xff \
     flowid $FLOWID
+
 for MAC in ${LOW_PRIORITY[@]}
 do
     iptables -t mangle -A UPLINK -m mac --mac-source $MAC -j MARK --set-mark $MARK
