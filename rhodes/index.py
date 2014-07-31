@@ -18,8 +18,13 @@ sys.stdout.flush()
 
 os.umask(0002)  # Full group access
 
+iHorizon = time.time() - (3600*8)
+
 lDevices = []
 for rDB in sorted(glob.glob("*.rrd")):
+    if os.stat(rDB).st_mtime < iHorizon:
+        continue
+
     lDeviceDescription = [
         "DEF:rx=%s:rx:AVERAGE" % rDB,
         "DEF:raw_tx=%s:tx:AVERAGE" % rDB,

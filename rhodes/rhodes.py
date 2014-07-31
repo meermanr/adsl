@@ -115,8 +115,11 @@ class Device( object ):
             self.iTime = iTime
 
         elif self.iTime < iTime:
-            sSample = Sample(self.iTime, self.iOctetsRX, self.iOctetsTX)
-            self.sBuffer.append( sSample )
+            if self.iOctetsRX or self.iOctetsTX:
+                # Skip blank readings (so the mtime on the RRD file can be used 
+                # to see when the last update was)
+                sSample = Sample(self.iTime, self.iOctetsRX, self.iOctetsTX)
+                self.sBuffer.append( sSample )
             self.iTime = iTime
             self.iOctetsRX = 0
             self.iOctetsTX = 0
@@ -373,6 +376,10 @@ def is_unicast(iMAC):
 
     # IPv6 Multicast
     elif iMAC >> 32 == 0x3333:
+        return False
+
+    # Virtual Router Redundancy Protocol
+    elif iMAC >> 8 == 0x00005e0001:
         return False
 
     else:
