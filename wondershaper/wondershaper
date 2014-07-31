@@ -257,6 +257,9 @@ tc filter add dev $DEV parent 1: protocol ip prio $PRIORITY u32 \
 # Traffic headed to robmeerman.co.uk (typically SSH proxying to else where)
 iptables -t mangle -A UPLINK --destination 85.119.82.218/32 -j MARK --set-mark $MARK
 
+# Traffic headed to vpn1.cambridge.arm.com (working from home)
+iptables -t mangle -A UPLINK --destination 217.140.97.4/32 -j MARK --set-mark $MARK
+
 for MAC in ${HIGH_PRIORITY[@]}
 do
     iptables -t mangle -A UPLINK -m mac --mac-source $MAC -j MARK --set-mark $MARK
