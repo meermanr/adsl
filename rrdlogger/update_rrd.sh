@@ -70,8 +70,8 @@ do
 
     # Run scripts in parallel, and redirect their STDOUT
     ./timelimit.py -t 20 ./get_plusnet_stable_rate.py > .last_plusnet_stable_rate &
-    ./timelimit.py -t 20 ./get_adsl_data.py > .last_adsl_data &
-    ./timelimit.py -t 20 ./get_gw_ping.py > .last_gw_ping &
+    ./timelimit.py -t 20 ./get_adsl_data.sh > .last_adsl_data &
+    ./timelimit.py -t 20 ./get_gw_ping.sh > .last_gw_ping &
     ./timelimit.py -t 20 ./get_temp.sh > .last_temp &
 
     wait

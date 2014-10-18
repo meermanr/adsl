@@ -5,6 +5,20 @@ import sys
 import config
 
 def get_gateway_ip():
+    import subprocess
+    import time
+    """
+    (echo -e 'admin\nCP1421VFF58\n:ip rtlist\nexit\n'; sleep 1 ) | telnet 192.168.1.254 | sed -ne '/\/32 Internet/{s/^\s*//; s/\/.*$//; p}'
+    """
+    cmd = ['telnet', config.modem_ip]
+    p = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+    p.stdin.write(config.modem_user+"\n")
+    p.stdin.write(config.modem_pass+"\n")
+    p.stdin.write(":ip rtlist\n")
+    time.sleep(1)
+    s = p.stdout.read().strip()
+    p.close()
+    print p
     import telnetlib
 
     try:

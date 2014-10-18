@@ -10,3 +10,4 @@ supervise/
 .modem_pass
 .plusnet_user
 .plusnet_pass
+.gw_ip

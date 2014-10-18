@@ -81,9 +81,9 @@ for title, start, end in periods:
         "--right-axis", "0.00001:0",
         "--right-axis-label", "dB or C",
         "--title", title,
-        "--lower-limit", "-1000000",
-        "--upper-limit", "6000000",
-        "--rigid",      # Do not accommodate values > upper-limit
+        # "--lower-limit", "-1000000",
+        # "--upper-limit", "6000000",
+        # "--rigid",      # Do not accommodate values > upper-limit
         "--lazy",
         "--width", "1024",
         "--height", "200",
